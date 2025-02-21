@@ -57,6 +57,7 @@ npm run dev
 
 ### 開発用URL
 - アプリケーション: http://localhost
+- バックエンドAPI: http://localhost:80
 
 ## API仕様
 
