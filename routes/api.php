@@ -19,4 +19,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-Route::post('/orders/upload', [OrderController::class, 'upload']);
+Route::middleware('api')->group(function () {
+    Route::post('/orders/upload', [OrderController::class, 'upload']);
+});
