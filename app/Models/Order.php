@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasTimestamps;
 
 class Order extends Model
 {
     use HasFactory;
-    use Illuminate\Database\Eloquent\Concerns\HasTimestamps;
+    use HasTimestamps;
 
     protected $fillable = [
         'year_month',
