@@ -27,6 +27,17 @@ services:
             - meilisearch
             - mailpit
             - selenium
+    python.ocr:
+        build:
+            context: ./python-service
+            dockerfile: Dockerfile
+        ports:
+            - '${PYTHON_PORT:-8000}:8000'
+        volumes:
+            - './python-service:/app'
+        networks:
+            - sail
+        restart: unless-stopped
     mysql:
         image: 'mysql/mysql-server:8.0'
         ports:
