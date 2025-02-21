@@ -1,0 +1,20 @@
+language: ja
+reviews:
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  path_filters:
+    - "python-service/**/*.py"
+    - "python-service/requirements.txt"
+    - "python-service/Dockerfile"
+  auto_review:
+    enabled: true
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+    drafts: false
+  notifications:
+    - type: github_pr_review
+chat:
+  auto_reply: true
