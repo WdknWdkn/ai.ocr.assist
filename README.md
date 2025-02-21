@@ -56,7 +56,7 @@ npm run dev
 ```
 
 ### 開発用URL
-- フロントエンド: http://localhost:3000
+- アプリケーション: http://localhost
 - バックエンドAPI: http://localhost:80
 
 ## API仕様
