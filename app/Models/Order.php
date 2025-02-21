@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     use HasFactory;
+    use Illuminate\Database\Eloquent\Concerns\HasTimestamps;
 
     protected $fillable = [
         'year_month',
