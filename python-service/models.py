@@ -1,29 +1,15 @@
 from pydantic import BaseModel
-from typing import List, Optional
-
-class OrderData(BaseModel):
-    業者ID: str
-    業者名: str
-    建物名: str
-    番号: str
-    受付内容: str
-    支払金額: str
-    完工日: str
-    支払日: str
-    請求日: str
-
-class InvoiceData(BaseModel):
-    発注番号: str
-    金額: str
-    物件名: str
-    部屋番号: str
-    工事業者名: str
-
-class MatchResponse(BaseModel):
-    diff_rows: List[dict]
+from typing import Optional, Dict, Any
 
 class ParseResponse(BaseModel):
-    parsed_orders: List[OrderData]
+    message: str
+    data: Dict[str, Any]
 
 class InvoiceResponse(BaseModel):
-    invoice_data: List[InvoiceData]
+    message: str
+    text: str
+
+class MatchResponse(BaseModel):
+    message: str
+    orders: Dict[str, Any]
+    invoice_text: str

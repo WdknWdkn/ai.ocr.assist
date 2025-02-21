@@ -1,109 +1,46 @@
 # AI OCR Assist
 
-OCRアシスト機能を提供するWebアプリケーション
+OCR service for processing orders and invoices with Japanese language support.
 
-## 開発環境のセットアップ / Development Environment Setup
+## API Endpoints
 
-### 必要条件 / Requirements
-
-- Docker
-- Docker Compose
-- Git
-
-### セットアップ手順 / Setup Instructions
-
-1. リポジトリのクローン / Clone the repository
-```bash
-git clone https://github.com/WdknWdkn/ai.ocr.assist.git
-cd ai.ocr.assist
+### Parse Orders
+```http
+POST /api/v1/orders/parse
 ```
+Parse CSV or Excel order files.
+- File size limit: 1MB
+- Supported formats: CSV, XLSX
 
-2. 環境設定ファイルの作成 / Create environment file
-```bash
-cp .env.example .env
+### Parse Invoices
+```http
+POST /api/v1/invoices/parse
 ```
+Parse PDF invoices with optional OCR support.
+- File size limit: 1MB
+- OCR support for Japanese text
+- Parameter: use_ocr (boolean)
 
-3. Dockerコンテナの起動 / Start Docker containers
-```bash
-./vendor/bin/sail up -d
+### Match Documents
+```http
+POST /api/v1/match
 ```
+Match orders with invoices.
+- File size limit: 1MB per file
+- Requires both order file and invoice PDF
 
-4. 依存パッケージのインストール / Install dependencies
-```bash
-./vendor/bin/sail composer install
-./vendor/bin/sail npm install
-```
+## Development Setup
 
-5. アプリケーションキーの生成 / Generate application key
-```bash
-./vendor/bin/sail artisan key:generate
-```
+1. Install Docker and Docker Compose
+2. Clone the repository
+3. Create `.env` file with required environment variables:
+   ```
+   OPENAI_API_KEY=your_api_key
+   ```
+4. Start the services:
+   ```bash
+   docker-compose up -d
+   ```
 
-6. データベースのマイグレーション / Run database migrations
-```bash
-./vendor/bin/sail artisan migrate
-```
-
-7. フロントエンド開発サーバーの起動 / Start frontend development server
-```bash
-./vendor/bin/sail npm run dev
-```
-
-### アクセス方法 / Access Information
-
-- メインアプリケーション / Main Application: http://localhost
-- メール確認用UI / Mail Testing UI (Mailpit): http://localhost:8025
-
-### 開発環境の特徴 / Development Environment Features
-
-- Laravel Sail (Docker)による開発環境
-- Laravel 10.x
-- React + Inertia.js
-- MySQL 8.0
-- 日本時間対応 / Japanese timezone support
-- ユーザー認証機能 / User authentication system
-
-### テスト用アカウント / Test Account
-
-```
-Email: test@example.com
-Password: password
-```
-
-### 便利なコマンド / Useful Commands
-
-```bash
-# コンテナの停止 / Stop containers
-./vendor/bin/sail down
-
-# コンポーザーパッケージのインストール / Install Composer packages
-./vendor/bin/sail composer require package-name
-
-# NPMパッケージのインストール / Install NPM packages
-./vendor/bin/sail npm install package-name
-
-# テストの実行 / Run tests
-./vendor/bin/sail test
-
-# アセットのビルド / Build assets
-./vendor/bin/sail npm run build
-```
-
-## トラブルシューティング / Troubleshooting
-
-1. ポートの競合 / Port conflicts
-```bash
-# 既存のプロセスを確認 / Check existing processes
-sudo lsof -i :80
-sudo lsof -i :3306
-
-# 必要に応じてプロセスを停止 / Stop processes if needed
-sudo kill -9 <PID>
-```
-
-2. パーミッションエラー / Permission errors
-```bash
-# ストレージディレクトリの権限修正 / Fix storage directory permissions
-./vendor/bin/sail artisan storage:link
-chmod -R 777 storage bootstrap/cache
-```
+## Testing
+Access the API documentation at http://localhost:8000/docs
