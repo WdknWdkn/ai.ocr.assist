@@ -30,6 +30,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 >
                                     Dashboard
                                 </NavLink>
+                                <NavLink
+                                    href={route('orders.upload.form')}
+                                    active={route().current('orders.upload.form')}
+                                >
+                                    発注一覧アップロード
+                                </NavLink>
                             </div>
                         </div>
 
@@ -133,6 +139,12 @@ export default function AuthenticatedLayout({ header, children }) {
                             active={route().current('dashboard')}
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route('orders.upload.form')}
+                            active={route().current('orders.upload.form')}
+                        >
+                            発注一覧アップロード
                         </ResponsiveNavLink>
                     </div>
 
