@@ -27,14 +27,18 @@ class OrderController extends Controller
             $request->file('file')
         );
 
+        $message = '発注書一覧が正常にアップロードされました。';
+
         if ($request->wantsJson()) {
             return response()->json([
-                'message' => 'Orders imported successfully'
+                'message' => $message
             ]);
         }
 
-        return redirect()
-            ->route('orders.upload.form')
-            ->with('success', '発注書一覧が正常にアップロードされました。');
+        return Inertia::render('Orders/Upload', [
+            'flash' => [
+                'success' => $message
+            ]
+        ]);
     }
 }

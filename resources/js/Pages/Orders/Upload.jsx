@@ -25,6 +25,11 @@ export default function Upload() {
                         <div className="p-6">
                             <h2 className="text-2xl font-bold mb-6 text-center">発注書一覧アップロード</h2>
                             
+                            {flash?.success && (
+                                <div className="mb-4 p-4 bg-green-100 text-green-700 rounded">
+                                    {flash.success}
+                                </div>
+                            )}
                             {errors.file && (
                                 <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
                                     {errors.file}
