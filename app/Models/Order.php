@@ -10,6 +10,7 @@ class Order extends Model
     use HasFactory;
 
     protected $fillable = [
+        'year_month',
         'vendor_id',
         'vendor_name',
         'building_name',

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
+            $table->string('year_month')->comment('年月');
             $table->integer('vendor_id')->comment('業者ID');
             $table->string('vendor_name')->comment('業者名');
             $table->string('building_name')->comment('建物名');
