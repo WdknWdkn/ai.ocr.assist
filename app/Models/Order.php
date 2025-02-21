@@ -21,7 +21,8 @@ class Order extends Model
         'payment_amount',
         'completion_date',
         'payment_date',
-        'billing_date'
+        'billing_date',
+        'erase_flg'
     ];
 
     protected $casts = [
