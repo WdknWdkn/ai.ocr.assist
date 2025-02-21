@@ -21,7 +21,7 @@ class OrdersImport implements ToModel, WithHeadingRow, WithValidation
     {
         return new Order([
             'year_month' => $this->year_month,
-            'vendor_id' => $row['業者id'],
+            'vendor_id' => $row['業者ID'],
             'vendor_name' => $row['業者名'],
             'building_name' => $row['建物名'],
             'number' => $row['番号'],
@@ -36,7 +36,7 @@ class OrdersImport implements ToModel, WithHeadingRow, WithValidation
     public function rules(): array
     {
         return [
-            '*.業者id' => ['required', 'integer'],
+            '*.業者ID' => ['required', 'integer'],
             '*.業者名' => ['required', 'string'],
             '*.建物名' => ['required', 'string'],
             '*.番号' => ['required', 'integer'],
