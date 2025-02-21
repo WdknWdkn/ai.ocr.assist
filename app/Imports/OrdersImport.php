@@ -7,6 +7,9 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Imports\HeadingRowFormatter;
+
+HeadingRowFormatter::default('none');
 
 class OrdersImport implements ToModel, WithHeadingRow, WithValidation
 {
@@ -36,15 +39,15 @@ class OrdersImport implements ToModel, WithHeadingRow, WithValidation
     public function rules(): array
     {
         return [
-            '*.業者ID' => ['required', 'integer'],
-            '*.業者名' => ['required', 'string'],
-            '*.建物名' => ['required', 'string'],
-            '*.番号' => ['required', 'integer'],
-            '*.受付内容' => ['required', 'string'],
-            '*.支払金額' => ['required', 'integer'],
-            '*.完工日' => ['required', 'date'],
-            '*.支払日' => ['required', 'date'],
-            '*.請求日' => ['required', 'date']
+            '業者ID' => ['required', 'integer'],
+            '業者名' => ['required', 'string'],
+            '建物名' => ['required', 'string'],
+            '番号' => ['required', 'integer'],
+            '受付内容' => ['required', 'string'],
+            '支払金額' => ['required', 'integer'],
+            '完工日' => ['required', 'date'],
+            '支払日' => ['required', 'date'],
+            '請求日' => ['required', 'date']
         ];
     }
 
