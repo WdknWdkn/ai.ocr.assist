@@ -1,6 +1,8 @@
-import { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import YearMonthInput from '@/Components/YearMonthInput';
+import FileInput from '@/Components/FileInput';
+import SubmitButton from '@/Components/SubmitButton';
 
 export default function Upload() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -38,51 +40,35 @@ export default function Upload() {
                             )}
 
                             <form onSubmit={handleSubmit} className="space-y-6">
-                                <div>
-                                    <label htmlFor="year_month" className="block text-sm font-medium text-gray-700">
-                                        年月 (YYYY-MM)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="year_month"
-                                        pattern="\d{4}-\d{2}"
-                                        placeholder="2025-02"
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                        value={data.year_month}
-                                        onChange={e => setData('year_month', e.target.value)}
-                                        required
-                                    />
-                                    {errors.year_month && (
-                                        <p className="mt-2 text-sm text-red-600">{errors.year_month}</p>
-                                    )}
-                                </div>
+                                <YearMonthInput
+                                    label="年月 (YYYY-MM)"
+                                    value={data.year_month}
+                                    onChange={e => setData('year_month', e.target.value)}
+                                    error={errors.year_month}
+                                    required
+                                />
 
-                                <div>
-                                    <label htmlFor="file" className="block text-sm font-medium text-gray-700">
-                                        発注書一覧エクセル
-                                    </label>
-                                    <input
-                                        type="file"
-                                        id="file"
-                                        accept=".xlsx,.csv"
-                                        className="mt-1 block w-full"
-                                        onChange={e => setData('file', e.target.files[0])}
-                                        required
-                                    />
-                                    <p className="mt-2 text-sm text-gray-500">
-                                        ファイルサイズ上限: 1MB<br />
-                                        対応形式: Excel (.xlsx), CSV (.csv)
-                                    </p>
-                                </div>
+                                <FileInput
+                                    label="発注書一覧エクセル"
+                                    onChange={e => setData('file', e.target.files[0])}
+                                    error={errors.file}
+                                    accept=".xlsx,.csv"
+                                    required
+                                    helpText={
+                                        <>
+                                            ファイルサイズ上限: 1MB<br />
+                                            対応形式: Excel (.xlsx), CSV (.csv)
+                                        </>
+                                    }
+                                />
 
                                 <div className="flex justify-center">
-                                    <button
-                                        type="submit"
-                                        disabled={processing}
-                                        className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                                    <SubmitButton
+                                        processing={processing}
+                                        processingText="アップロード中..."
                                     >
-                                        {processing ? 'アップロード中...' : 'アップロード'}
-                                    </button>
+                                        アップロード
+                                    </SubmitButton>
                                 </div>
                             </form>
                         </div>
