@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,11 @@ Route::get('/', function () {
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
+});
+
+Route::prefix('orders')->group(function () {
+    Route::get('/upload', [OrderController::class, 'showUploadForm'])->name('orders.upload.form');
+    Route::post('/upload', [OrderController::class, 'upload'])->name('orders.upload');
 });
 
 Route::get('/dashboard', function () {
