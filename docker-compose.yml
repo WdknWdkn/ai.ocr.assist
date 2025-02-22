@@ -23,9 +23,6 @@ services:
             - sail
         depends_on:
             - mysql
-            - redis
-            - meilisearch
-            - mailpit
             - selenium
     python.ocr:
         build:
