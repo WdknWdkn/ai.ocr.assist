@@ -4,7 +4,7 @@ import YearMonthInput from '@/Components/YearMonthInput';
 import FileInput from '@/Components/FileInput';
 import SubmitButton from '@/Components/SubmitButton';
 
-export default function Upload() {
+export default function Upload({ flash }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         year_month: '',
         file: null,
