@@ -8,3 +8,10 @@ docker-compose.override.yml
 /public/hot/
 /public/storage/
 /storage/*.key
+
+# Python
+__pycache__/
+venv/
+
+# Development
+public/hot
