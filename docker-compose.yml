@@ -55,9 +55,8 @@ services:
             - 'sail-mysql:/var/lib/mysql'
             - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
         command: >
-            --socket=/var/lib/mysql/mysql.sock
-            --mysqlx-socket=/var/lib/mysql/mysqlx.sock
-            --pid-file=/var/lib/mysql/mysqld.pid
+            --initialize-insecure
+            --user=mysql
         networks:
             - sail
         healthcheck:
