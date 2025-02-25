@@ -48,32 +48,17 @@ class PythonOrderParser
             ]);
 
             $pythonScript = base_path('python-service/parse_order_lambda.py');
-            Log::debug('Running Python script:', [
+            $pythonVenv = base_path('python-service/venv/bin/python');
+            
+            Log::debug('Using Python from venv:', [
+                'python_path' => $pythonVenv,
                 'script_path' => $pythonScript,
                 'script_exists' => file_exists($pythonScript),
                 'script_permissions' => fileperms($pythonScript),
-                'script_content' => file_exists($pythonScript) ? file_get_contents($pythonScript) : null,
-                'content_preview' => substr($content, 0, 1000),
-                'content_length' => strlen($content),
                 'temp_file_exists' => file_exists($tempFile),
-                'temp_file_content' => file_exists($tempFile) ? file_get_contents($tempFile) : null,
                 'temp_file_permissions' => file_exists($tempFile) ? fileperms($tempFile) : null,
-                'python_version' => shell_exec('python3 --version'),
                 'working_directory' => getcwd()
             ]);
-            
-            Log::debug('Running Python script with args:', [
-                'script' => $pythonScript,
-                'temp_file' => $tempFile,
-                'filename' => $filename,
-                'script_exists' => file_exists($pythonScript),
-                'temp_file_exists' => file_exists($tempFile),
-                'temp_file_content' => file_exists($tempFile) ? file_get_contents($tempFile) : null,
-                'working_dir' => getcwd()
-            ]);
-
-            $pythonVenv = dirname($pythonScript) . '/venv/bin/python';
-            Log::debug('Using Python from venv:', ['python_path' => $pythonVenv]);
 
             $result = Process::timeout(self::TIMEOUT_SECONDS)->run([
                 $pythonVenv,
@@ -95,18 +80,9 @@ class PythonOrderParser
             $errorOutput = $result->errorOutput();
             
             Log::debug('Python script execution:', [
-                'command' => 'python3 ' . $pythonScript . ' ' . $tempFile . ' ' . $filename,
                 'raw_output' => $rawOutput,
                 'error_output' => $errorOutput,
-                'exit_code' => $result->exitCode(),
-                'temp_file_exists' => file_exists($tempFile),
-                'temp_file_size' => file_exists($tempFile) ? filesize($tempFile) : null,
-                'temp_file_content' => file_exists($tempFile) ? file_get_contents($tempFile) : null
-            ]);
-
-            Log::debug('Raw Python output:', [
-                'output' => $rawOutput,
-                'error' => $result->errorOutput()
+                'exit_code' => $result->exitCode()
             ]);
 
             $output = json_decode($rawOutput, true);
@@ -118,10 +94,6 @@ class PythonOrderParser
                 throw new RuntimeException('不正な出力形式です。');
             }
 
-            Log::debug('Decoded Python output:', [
-                'output' => $output
-            ]);
-
             if (!$output || !is_array($output)) {
                 Log::error('Invalid output format:', [
                     'output' => $output
@@ -129,19 +101,7 @@ class PythonOrderParser
                 throw new RuntimeException('不正な出力形式です。');
             }
 
-            $orders = $output;
-            Log::debug('Parsed orders:', [
-                'orders' => $orders,
-                'first_order' => $orders[0] ?? null,
-                'count' => count($orders)
-            ]);
-
-            return $orders;
-        } catch (ProcessTimedOutException $e) {
-            Log::error('Python process timeout:', [
-                'error' => $e->getMessage()
-            ]);
-            throw new RuntimeException('ファイルの処理がタイムアウトしました。');
+            return $output;
         } catch (RuntimeException $e) {
             throw $e;
         } catch (Exception $e) {

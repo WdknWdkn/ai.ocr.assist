@@ -19,6 +19,7 @@ services:
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
         volumes:
             - '.:/var/www/html'
+            - './python-service/venv:/var/www/html/python-service/venv'
         networks:
             - sail
         depends_on:
@@ -32,6 +33,7 @@ services:
             - '${PYTHON_PORT:-8000}:8000'
         volumes:
             - './python-service:/app'
+            - './python-service/venv:/app/venv'
         environment:
             - OPENAI_API_KEY=${OPENAI_API_KEY}
         networks:
