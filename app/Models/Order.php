@@ -26,8 +26,12 @@ class Order extends Model
     ];
 
     protected $casts = [
+        'vendor_id' => 'integer',
+        'number' => 'integer',
+        'payment_amount' => 'integer',
         'completion_date' => 'date',
         'payment_date' => 'date',
-        'billing_date' => 'date'
+        'billing_date' => 'date',
+        'erase_flg' => 'boolean'
     ];
 }

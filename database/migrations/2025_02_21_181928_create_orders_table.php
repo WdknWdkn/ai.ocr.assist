@@ -23,6 +23,7 @@ return new class extends Migration
             $table->date('completion_date')->comment('完工日');
             $table->date('payment_date')->comment('支払日');
             $table->date('billing_date')->comment('請求日');
+            $table->boolean('erase_flg')->default(false)->comment('照合完了フラグ');
             $table->timestamp('created_at')->comment('登録日')->nullable();
             $table->timestamp('updated_at')->comment('更新日')->nullable();
         });
