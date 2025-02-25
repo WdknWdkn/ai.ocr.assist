@@ -5,19 +5,19 @@ namespace Tests\Feature;
 use App\Models\Order;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class OrderControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    use RefreshDatabase;
-
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Configure test environment
         config([
             'database.default' => 'mysql',
@@ -26,10 +26,16 @@ class OrderControllerTest extends TestCase
             'database.connections.mysql.username' => 'sail',
             'database.connections.mysql.password' => 'password'
         ]);
-        
+
+        // Run migrations
+        $this->artisan('migrate:fresh');
+
         // Create and authenticate a user for testing
         $user = \App\Models\User::factory()->create();
         $this->actingAs($user);
+
+        // Enable query logging
+        DB::enableQueryLog();
     }
 
     protected function defineEnvironment($app)
@@ -40,45 +46,60 @@ class OrderControllerTest extends TestCase
         $app['config']->set('session.expire_on_close', false);
     }
 
-    public function test_can_upload_valid_csv_file()
+    protected function tearDown(): void
     {
+        // Clean up database
+        $this->artisan('migrate:fresh');
+        
+        parent::tearDown();
+    }
+
+    public function test_can_upload_valid_csv_file(): void
+    {
+        Log::debug('Starting test_can_upload_valid_csv_file');
+
+        $filePath = base_path('tests/data/valid_orders.csv');
+        Log::debug('Test file:', [
+            'path' => $filePath,
+            'exists' => file_exists($filePath),
+            'content' => file_exists($filePath) ? file_get_contents($filePath) : null
+        ]);
+
         $file = new UploadedFile(
-            base_path('tests/data/valid_orders.csv'),
+            $filePath,
             'valid_orders.csv',
             'text/csv',
             null,
             true
         );
 
-        $response = $this->post('/orders/upload', [
-            'file' => $file,
-            'year_month' => '2025-02'
-        ]);
+        $response = $this->withoutMiddleware()
+            ->post('/orders/upload', [
+                'file' => $file,
+                'year_month' => '2025-02'
+            ]);
 
-        $response->assertRedirect();
-        
         Log::debug('Response:', [
             'status' => $response->status(),
-            'session' => $response->getSession()->all(),
-            'errors' => $response->getSession()->get('errors')
+            'session' => session()->all(),
+            'orders_count' => Order::count(),
+            'all_orders' => Order::all()->toArray(),
+            'query_log' => DB::getQueryLog()
         ]);
-        
-        // Check database state
-        $orders = Order::all();
-        Log::debug('Database state:', [
-            'count' => $orders->count(),
-            'orders' => $orders->toArray()
-        ]);
-        
+
+        $response->assertRedirect(route('orders.upload.form'));
+        $response->assertSessionDoesntHaveErrors();
+        $response->assertSessionHas('success', '発注書一覧が正常にアップロードされました。');
+
         $order = Order::where([
-            'vendor_id' => '1001',
+            'vendor_id' => 1001,
             'vendor_name' => 'テスト業者1',
             'year_month' => '2025-02'
         ])->first();
         
         $this->assertNotNull($order, 'Order was not created in database');
         $this->assertDatabaseHas('orders', [
-            'vendor_id' => '1001',
+            'vendor_id' => 1001,
             'vendor_name' => 'テスト業者1',
             'year_month' => '2025-02'
         ]);

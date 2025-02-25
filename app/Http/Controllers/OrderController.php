@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use RuntimeException;
 
 class OrderController extends Controller
 {
@@ -47,7 +46,6 @@ class OrderController extends Controller
         ]);
 
         if ($validator->fails()) {
-            Log::debug('Validation failed:', ['errors' => $validator->errors()->toArray()]);
             return redirect()
                 ->back()
                 ->withErrors($validator)
@@ -57,112 +55,86 @@ class OrderController extends Controller
         try {
             $file = $request->file('file');
             $yearMonth = $request->input('year_month');
-            
-            Log::debug('Starting file upload:', [
-                'filename' => $file->getClientOriginalName(),
-                'size' => $file->getSize(),
+
+            Log::debug('Starting file upload process', [
+                'file_name' => $file->getClientOriginalName(),
+                'file_size' => $file->getSize(),
                 'year_month' => $yearMonth,
-                'content' => base64_encode($file->get())
+                'mime_type' => $file->getMimeType(),
+                'extension' => $file->getClientOriginalExtension()
             ]);
-            
-            DB::beginTransaction();
-            
-            Log::debug('Database state before parse:', [
-                'connection' => DB::connection()->getDatabaseName(),
-                'transaction_level' => DB::transactionLevel(),
-                'orders_count' => Order::count()
+
+            $content = $file->get();
+            Log::debug('File content:', [
+                'content_length' => strlen($content),
+                'content_preview' => substr($content, 0, 1000),
+                'content_type' => $file->getClientMimeType()
             ]);
-            
-            $orders = $this->parser->parse(
-                $file->get(),
-                $file->getClientOriginalName()
-            );
-            
+
+            Log::debug('Parsing file with PythonOrderParser');
+            $orders = $this->parser->parse($content, $file->getClientOriginalName());
             Log::debug('Parsed orders:', [
                 'count' => count($orders),
                 'first_order' => $orders[0] ?? null,
                 'all_orders' => $orders
             ]);
-            
-            Log::debug('Parsed orders:', [
-                'count' => count($orders),
-                'first_order' => $orders[0] ?? null
-            ]);
-            
-            Log::debug('Parsed orders:', [
-                'count' => count($orders),
-                'first_order' => $orders[0] ?? null
-            ]);
 
-            if (empty($orders)) {
-                throw new RuntimeException('ファイルの内容が正しくありません。');
-            }
+            DB::beginTransaction();
 
-            Log::debug('Creating orders:', ['orders' => $orders]);
-            foreach ($orders as $orderData) {
-                if (empty($orderData['業者ID']) || empty($orderData['業者名'])) {
-                    throw new RuntimeException('必須項目が不足しています。');
+            try {
+                foreach ($orders as $orderData) {
+                    Log::debug('Processing order data:', [
+                        'raw_data' => $orderData,
+                        'keys' => array_keys($orderData)
+                    ]);
+
+                    $data = [
+                        'year_month' => $yearMonth,
+                        'vendor_id' => (int)$orderData['業者ID'],
+                        'vendor_name' => $orderData['業者名'],
+                        'building_name' => $orderData['建物名'],
+                        'number' => (int)$orderData['番号'],
+                        'reception_details' => $orderData['受付内容'],
+                        'payment_amount' => (int)$orderData['支払金額'],
+                        'completion_date' => date('Y-m-d', strtotime($orderData['完工日'])),
+                        'payment_date' => date('Y-m-d', strtotime($orderData['支払日'])),
+                        'billing_date' => date('Y-m-d', strtotime($orderData['請求日'])),
+                        'erase_flg' => false
+                    ];
+
+                    Log::debug('Creating order:', [
+                        'prepared_data' => $data,
+                        'year_month' => $yearMonth,
+                        'vendor_id' => (int)$orderData['業者ID']
+                    ]);
+
+                    $order = Order::create($data);
+                    Log::debug('Created order:', [
+                        'order_id' => $order->id,
+                        'order_data' => $order->toArray()
+                    ]);
                 }
 
-                $order = Order::create([
-                    'year_month' => $yearMonth,
-                    'vendor_id' => $orderData['業者ID'],
-                    'vendor_name' => $orderData['業者名'],
-                    'building_name' => $orderData['建物名'],
-                    'number' => $orderData['番号'],
-                    'reception_details' => $orderData['受付内容'],
-                    'payment_amount' => $orderData['支払金額'],
-                    'completion_date' => $orderData['完工日'],
-                    'payment_date' => $orderData['支払日'],
-                    'billing_date' => $orderData['請求日'],
-                    'erase_flg' => false
-                ]);
-                Log::debug('Created order:', ['order' => $order->toArray()]);
-            }
+                DB::commit();
 
-            Log::debug('Before commit:', [
-                'orders_count' => Order::count(),
-                'transaction_level' => DB::transactionLevel()
-            ]);
-            
-            DB::commit();
-            
-            Log::debug('After commit:', [
-                'orders_count' => Order::count(),
-                'transaction_level' => DB::transactionLevel()
-            ]);
-            
-            $message = '発注書一覧が正常にアップロードされました。';
-
-            if ($request->wantsJson()) {
-                return response()->json(['message' => $message]);
-            }
-
-            return redirect()->route('orders.upload.form')
-                ->with('success', $message);
-        } catch (RuntimeException $e) {
-            if (DB::transactionLevel() > 0) {
+                return redirect()->route('orders.upload.form')
+                    ->with('success', '発注書一覧が正常にアップロードされました。');
+            } catch (Exception $e) {
                 DB::rollBack();
+                throw $e;
             }
-            Log::error('Order parse error:', ['error' => $e->getMessage()]);
-            return redirect()
-                ->back()
-                ->withErrors(['file' => $e->getMessage()])
-                ->withInput();
-        } catch (ValidationException $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-            Log::error('Validation error:', ['error' => $e->errors()]);
-            return redirect()
-                ->back()
-                ->withErrors($e->errors())
-                ->withInput();
         } catch (Exception $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-            Log::error('Order upload error:', ['error' => $e->getMessage()]);
+            Log::error('Upload failed:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $request->file('file') ? [
+                    'name' => $request->file('file')->getClientOriginalName(),
+                    'size' => $request->file('file')->getSize(),
+                    'mime' => $request->file('file')->getMimeType()
+                ] : null,
+                'year_month' => $request->input('year_month')
+            ]);
+
             return redirect()
                 ->back()
                 ->withErrors(['file' => 'ファイルのアップロード中にエラーが発生しました。'])
