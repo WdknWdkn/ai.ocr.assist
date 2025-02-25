@@ -69,14 +69,18 @@ async def parse_orders(file: UploadFile):
             )
         
         if file.filename.endswith('.xlsx'):
-            result = parse_excel(content)
+            orders = parse_excel(content)
         else:
-            result = parse_csv(content)
+            orders = parse_csv(content)
             
-        return {"data": result}
+        if not isinstance(orders, list):
+            raise ValueError("不正な出力形式です。")
+            
+        return {"data": orders}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"Error in parse_orders: {str(e)}", file=sys.stderr)
         raise HTTPException(
             status_code=500,
             detail="ファイルの解析中にエラーが発生しました。"

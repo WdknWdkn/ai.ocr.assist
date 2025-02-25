@@ -21,7 +21,7 @@ def parse_csv(file_bytes):
         
         # Required fields check
         required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容", "支払金額", "完工日", "支払日", "請求日"]
-        headers = reader.fieldnames if reader.fieldnames else []
+        headers = [h.strip() for h in (reader.fieldnames or [])]
         
         # Check for missing required fields
         missing_fields = [field for field in required_fields if field not in headers]
@@ -35,13 +35,19 @@ def parse_csv(file_bytes):
                 continue
                 
             # Skip rows without vendor ID
-            if not row.get("業者ID"):
+            vendor_id = next((v.strip() for k, v in row.items() if k.strip() == "業者ID"), "")
+            if not vendor_id:
                 continue
                 
             order = {}
             try:
                 for field in required_fields:
-                    value = row.get(field, "").strip()
+                    # Find the matching header (accounting for whitespace)
+                    header = next((k for k in row.keys() if k.strip() == field), None)
+                    if header is None:
+                        continue
+                        
+                    value = row[header].strip()
                     
                     # Numeric fields
                     if field in ["業者ID", "番号", "支払金額"]:
@@ -98,10 +104,13 @@ def parse_excel(file_bytes):
         required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容", "支払金額", "完工日", "支払日", "請求日"]
         field_columns = {}
         
+        # ヘッダ行の全列をチェック
         for col in range(1, sheet.max_column + 1):
             header_value = sheet.cell(row=header_row, column=col).value
-            if header_value and str(header_value).strip() in required_fields:
-                field_columns[str(header_value).strip()] = col
+            if header_value:
+                header_str = str(header_value).strip()
+                if header_str in required_fields:
+                    field_columns[header_str] = col
 
         # 必須フィールドの存在チェック
         missing_fields = [field for field in required_fields if field not in field_columns]
