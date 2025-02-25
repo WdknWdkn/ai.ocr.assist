@@ -32,16 +32,16 @@ def validate_file_size(file_size: int):
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large (max 1MB)")
 
+from parse_order_lambda import parse_csv, parse_excel
+
 async def parse_excel_or_csv(file: UploadFile) -> dict:
     content = await file.read()
     validate_file_size(len(content))
     
     if file.filename.endswith('.csv'):
-        df = pd.read_csv(io.BytesIO(content))
+        return parse_csv(content)
     else:
-        df = pd.read_excel(io.BytesIO(content))
-    
-    return df.to_dict('records')[0] if not df.empty else {}
+        return parse_excel(content)
 
 async def extract_text_from_pdf(file: UploadFile, use_ocr: bool = False) -> str:
     content = await file.read()
@@ -63,10 +63,32 @@ async def extract_text_from_pdf(file: UploadFile, use_ocr: bool = False) -> str:
 @app.post("/api/v1/orders/parse")
 async def parse_orders(file: UploadFile):
     if not file.filename.endswith(('.csv', '.xlsx')):
-        raise HTTPException(status_code=400, detail="Invalid file format. Must be CSV or Excel")
+        raise HTTPException(
+            status_code=400,
+            detail="ファイルの形式が正しくありません。"
+        )
     
-    data = await parse_excel_or_csv(file)
-    return {"message": "Orders parsed successfully", "data": data}
+    try:
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="ファイルサイズは1MB以下にしてください。"
+            )
+        
+        if file.filename.endswith('.xlsx'):
+            result = parse_excel(content)
+        else:
+            result = parse_csv(content)
+            
+        return {"data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="ファイルの解析中にエラーが発生しました。"
+        )
 
 @app.post("/api/v1/invoices/parse")
 async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = False):
@@ -91,6 +113,10 @@ async def match_documents(orders_file: UploadFile, invoices_file: UploadFile):
         "orders": orders_data,
         "invoice_text": invoice_text
     }
+
+@app.get("/api/v1/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

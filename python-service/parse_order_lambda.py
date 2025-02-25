@@ -96,40 +96,4 @@ def parse_excel(file_bytes):
         raise
 
 if __name__ == "__main__":
-    try:
-        if len(sys.argv) != 3:
-            print(json.dumps({
-                "error": "ファイルの形式が正しくありません。"
-            }, ensure_ascii=False))
-            sys.exit(1)
-
-        temp_file_path = sys.argv[1]
-        filename = sys.argv[2]
-
-        try:
-            with open(temp_file_path, 'rb') as f:
-                file_bytes = f.read()
-        except FileNotFoundError:
-            print(json.dumps({
-                "error": "ファイルが見つかりません。"
-            }, ensure_ascii=False))
-            sys.exit(1)
-
-        try:
-            if filename.lower().endswith((".xlsx", ".xls")):
-                result = parse_excel(file_bytes)
-            else:
-                result = parse_csv(file_bytes)
-
-            print(json.dumps(result, ensure_ascii=False))
-            sys.exit(0)
-        except Exception as e:
-            print(json.dumps({
-                "error": f"ファイルの解析中にエラーが発生しました: {str(e)}"
-            }, ensure_ascii=False))
-            sys.exit(1)
-    except Exception as e:
-        print(json.dumps({
-            "error": f"予期せぬエラーが発生しました: {str(e)}"
-        }, ensure_ascii=False))
-        sys.exit(1)
+    print("This module is now used as a library and should not be run directly.")
