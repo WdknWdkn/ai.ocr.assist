@@ -34,14 +34,6 @@ def validate_file_size(file_size: int):
 
 from parse_order_lambda import parse_csv, parse_excel
 
-async def parse_excel_or_csv(file: UploadFile) -> dict:
-    content = await file.read()
-    validate_file_size(len(content))
-    
-    if file.filename.endswith('.csv'):
-        return parse_csv(content)
-    else:
-        return parse_excel(content)
 
 async def extract_text_from_pdf(file: UploadFile, use_ocr: bool = False) -> str:
     content = await file.read()
@@ -101,18 +93,44 @@ async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = False):
 @app.post("/api/v1/match")
 async def match_documents(orders_file: UploadFile, invoices_file: UploadFile):
     if not orders_file.filename.endswith(('.csv', '.xlsx')):
-        raise HTTPException(status_code=400, detail="Invalid orders file format")
+        raise HTTPException(
+            status_code=400,
+            detail="ファイルの形式が正しくありません。"
+        )
     if not invoices_file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Invalid invoice file format")
+        raise HTTPException(
+            status_code=400,
+            detail="PDFファイルを選択してください。"
+        )
     
-    orders_data = await parse_excel_or_csv(orders_file)
-    invoice_text = await extract_text_from_pdf(invoices_file, use_ocr=True)
-    
-    return {
-        "message": "Documents matched successfully",
-        "orders": orders_data,
-        "invoice_text": invoice_text
-    }
+    try:
+        content = await orders_file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="ファイルサイズは1MB以下にしてください。"
+            )
+        
+        if orders_file.filename.endswith('.xlsx'):
+            orders_data = parse_excel(content)
+        else:
+            orders_data = parse_csv(content)
+            
+        invoice_text = await extract_text_from_pdf(invoices_file, use_ocr=True)
+        
+        return {
+            "data": {
+                "orders": orders_data,
+                "invoice_text": invoice_text
+            }
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="ファイルの解析中にエラーが発生しました。"
+        )
 
 @app.get("/api/v1/health")
 async def health_check():
