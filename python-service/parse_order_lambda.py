@@ -89,8 +89,9 @@ def parse_excel(file_bytes):
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet = wb.worksheets[0]  # 先頭シートを読む想定
 
-        # タイトル行をスキップし、2行目をヘッダー行として使用
+        # タイトル行(1行目)をスキップし、2行目をヘッダー行として使用
         header_row = 2  # 2行目が必ずヘッダー行
+        data_start_row = 3  # 3行目からデータ開始
 
         # 必須フィールドとヘッダーのマッピング
         required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容", "支払金額", "完工日", "支払日", "請求日"]
@@ -123,12 +124,12 @@ def parse_excel(file_bytes):
         if missing_fields:
             raise ValueError(f"必須項目が見つかりません: {', '.join(missing_fields)}")
 
-        # データ行を読み込み
+        # データ行を読み込み (3行目から)
         orders = []
-        for row_idx in range(header_row + 1, sheet.max_row + 1):
+        for row_idx in range(data_start_row, sheet.max_row + 1):
             # 業者IDが空の行はスキップ
             vendor_id_cell = sheet.cell(row=row_idx, column=field_columns["業者ID"])
-            if not vendor_id_cell.value:
+            if not vendor_id_cell.value or str(vendor_id_cell.value).strip() == "業者ID":
                 continue
 
             order = {}
