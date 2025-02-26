@@ -89,28 +89,34 @@ def parse_excel(file_bytes):
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet = wb.worksheets[0]  # 先頭シートを読む想定
 
-        # ヘッダ行を探す（1～10行目）
-        header_row = None
-        for row_idx in range(1, 11):
-            cell_value = sheet.cell(row=row_idx, column=1).value
-            if cell_value and str(cell_value).strip() == "業者ID":
-                header_row = row_idx
-                break
+        # タイトル行をスキップし、2行目をヘッダー行として使用
+        header_row = 2  # 2行目が必ずヘッダー行
 
-        if header_row is None:
-            raise ValueError("ヘッダ行が見つかりません (1～10行目の1カラム目に「業者ID」がありません)")
-
-        # 必須フィールドの列インデックスを取得
+        # 必須フィールドとヘッダーのマッピング
         required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容", "支払金額", "完工日", "支払日", "請求日"]
-        field_columns = {}
+        header_mapping = {
+            "業者ID": "業者ID",
+            "業者名": "業者名",
+            "建物名": "建物名",
+            "番号": "番号",
+            "受付内容": "受付内容",
+            "支払金額": "支払金額",
+            "完工日": "完工日",
+            "支払日": "支払日",
+            "請求日": "請求日"
+        }
         
-        # ヘッダ行の全列をチェック
+        field_columns = {}
+        # ヘッダー行の全列をチェック
         for col in range(1, sheet.max_column + 1):
             header_value = sheet.cell(row=header_row, column=col).value
             if header_value:
                 header_str = str(header_value).strip()
-                if header_str in required_fields:
-                    field_columns[header_str] = col
+                # ヘッダーマッピングを使用して必須フィールドを検索
+                for required_field, mapped_header in header_mapping.items():
+                    if header_str == mapped_header:
+                        field_columns[required_field] = col
+                        break
 
         # 必須フィールドの存在チェック
         missing_fields = [field for field in required_fields if field not in field_columns]
