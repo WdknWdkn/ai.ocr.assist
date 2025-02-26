@@ -82,46 +82,130 @@ class OrderController extends Controller
             DB::beginTransaction();
 
             try {
-                foreach ($orders as $orderData) {
-                    Log::debug('Processing order data:', [
-                        'raw_data' => $orderData,
-                        'keys' => array_keys($orderData)
-                    ]);
+                $successCount = 0;
+                $skippedCount = 0;
+                $errors = [];
 
-                    $data = [
-                        'year_month' => $yearMonth,
-                        'vendor_id' => (int)$orderData['業者ID'],
-                        'vendor_name' => $orderData['業者名'],
-                        'building_name' => $orderData['建物名'],
-                        'number' => (int)$orderData['番号'],
-                        'reception_details' => $orderData['受付内容'],
-                        'payment_amount' => (int)$orderData['支払金額'],
-                        'completion_date' => date('Y-m-d', strtotime($orderData['完工日'])),
-                        'payment_date' => date('Y-m-d', strtotime($orderData['支払日'])),
-                        'billing_date' => date('Y-m-d', strtotime($orderData['請求日'])),
-                        'erase_flg' => false
-                    ];
+                foreach ($orders as $index => $orderData) {
+                    try {
+                        Log::debug('Processing order data:', [
+                            'row' => $index + 1,
+                            'raw_data' => $orderData,
+                            'keys' => array_keys($orderData)
+                        ]);
 
-                    Log::debug('Creating order:', [
-                        'prepared_data' => $data,
-                        'year_month' => $yearMonth,
-                        'vendor_id' => (int)$orderData['業者ID']
-                    ]);
+                        // データの検証
+                        if (!isset($orderData['業者ID']) || !is_numeric($orderData['業者ID'])) {
+                            $errors[] = ($index + 1) . "行目: 業者IDが不正です";
+                            $skippedCount++;
+                            continue;
+                        }
+                        if (!isset($orderData['業者名']) || empty(trim($orderData['業者名']))) {
+                            $errors[] = ($index + 1) . "行目: 業者名が未入力です";
+                            $skippedCount++;
+                            continue;
+                        }
+                        if (!isset($orderData['建物名']) || empty(trim($orderData['建物名']))) {
+                            $errors[] = ($index + 1) . "行目: 建物名が未入力です";
+                            $skippedCount++;
+                            continue;
+                        }
+                        if (!isset($orderData['番号']) || !is_numeric($orderData['番号'])) {
+                            $errors[] = ($index + 1) . "行目: 番号が不正です";
+                            $skippedCount++;
+                            continue;
+                        }
+                        if (!isset($orderData['受付内容']) || empty(trim($orderData['受付内容']))) {
+                            $errors[] = ($index + 1) . "行目: 受付内容が未入力です";
+                            $skippedCount++;
+                            continue;
+                        }
+                        if (!isset($orderData['支払金額']) || !is_numeric($orderData['支払金額'])) {
+                            $errors[] = ($index + 1) . "行目: 支払金額が不正です";
+                            $skippedCount++;
+                            continue;
+                        }
 
-                    $order = Order::create($data);
-                    Log::debug('Created order:', [
-                        'order_id' => $order->id,
-                        'order_data' => $order->toArray()
-                    ]);
+                        // 日付フィールドの検証
+                        foreach (['完工日', '支払日', '請求日'] as $dateField) {
+                            if (!isset($orderData[$dateField]) || empty(trim($orderData[$dateField]))) {
+                                $errors[] = ($index + 1) . "行目: {$dateField}が未入力です";
+                                $skippedCount++;
+                                continue 2;
+                            }
+                            try {
+                                $date = date('Y-m-d', strtotime($orderData[$dateField]));
+                                if ($date === false) {
+                                    $errors[] = ($index + 1) . "行目: {$dateField}の形式が不正です";
+                                    $skippedCount++;
+                                    continue 2;
+                                }
+                            } catch (Exception $e) {
+                                $errors[] = ($index + 1) . "行目: {$dateField}の形式が不正です";
+                                $skippedCount++;
+                                continue 2;
+                            }
+                        }
+
+                        $data = [
+                            'year_month' => $yearMonth,
+                            'vendor_id' => (int)$orderData['業者ID'],
+                            'vendor_name' => $orderData['業者名'],
+                            'building_name' => $orderData['建物名'],
+                            'number' => (int)$orderData['番号'],
+                            'reception_details' => $orderData['受付内容'],
+                            'payment_amount' => (int)$orderData['支払金額'],
+                            'completion_date' => date('Y-m-d', strtotime($orderData['完工日'])),
+                            'payment_date' => date('Y-m-d', strtotime($orderData['支払日'])),
+                            'billing_date' => date('Y-m-d', strtotime($orderData['請求日'])),
+                            'erase_flg' => false
+                        ];
+
+                        Log::debug('Creating order:', [
+                            'row' => $index + 1,
+                            'prepared_data' => $data
+                        ]);
+
+                        $order = Order::create($data);
+                        Log::debug('Created order:', [
+                            'row' => $index + 1,
+                            'order_id' => $order->id,
+                            'order_data' => $order->toArray()
+                        ]);
+
+                        $successCount++;
+                    } catch (Exception $e) {
+                        Log::warning('Row processing failed:', [
+                            'row' => $index + 1,
+                            'error' => $e->getMessage(),
+                            'data' => $orderData
+                        ]);
+                        $errors[] = ($index + 1) . "行目: " . $e->getMessage();
+                        $skippedCount++;
+                        continue;
+                    }
                 }
 
                 DB::commit();
 
+                $message = "{$successCount}件のデータを取り込みました。";
+                if ($skippedCount > 0) {
+                    $message .= " {$skippedCount}件のデータをスキップしました。";
+                }
+
                 return redirect()->route('orders.upload.form')
-                    ->with('success', '発注書一覧が正常にアップロードされました。');
+                    ->with('success', $message)
+                    ->with('warnings', $errors);
             } catch (Exception $e) {
                 DB::rollBack();
-                throw $e;
+                Log::error('Transaction failed:', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                return redirect()
+                    ->back()
+                    ->withErrors(['file' => 'データの保存中にエラーが発生しました。'])
+                    ->withInput();
             }
         } catch (Exception $e) {
             Log::error('Upload failed:', [

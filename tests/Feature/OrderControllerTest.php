@@ -89,7 +89,7 @@ class OrderControllerTest extends TestCase
 
         $response->assertRedirect(route('orders.upload.form'));
         $response->assertSessionDoesntHaveErrors();
-        $response->assertSessionHas('success', '発注書一覧が正常にアップロードされました。');
+        $response->assertSessionHas('success', '2件のデータを取り込みました。');
 
         $order = Order::where([
             'vendor_id' => 1001,
