@@ -2,6 +2,7 @@
 import pandas as pd
 import io
 import sys
+import json
 import logging
 from parse_order_lambda import parse_excel
 
@@ -41,10 +42,12 @@ def debug_excel_parsing(file_path):
         logger.debug("\nParsing with parse_excel function:")
         result = parse_excel(content)
         logger.debug("\nParse result:")
-        logger.debug(f"Number of records: {len(result)}")
-        if result:
-            logger.debug("First record:")
-            logger.debug(result[0])
+        logger.debug(f"Total rows: {result['total_rows']}")
+        logger.debug(f"Valid rows: {result['valid_rows']}")
+        logger.debug(f"Skipped rows: {result['skipped_rows']}")
+        if result['orders']:
+            logger.debug("\nFirst valid order:")
+            logger.debug(json.dumps(result['orders'][0], ensure_ascii=False, indent=2))
             
         return result
     except Exception as e:

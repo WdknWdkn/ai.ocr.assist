@@ -141,6 +141,9 @@ def parse_excel(file_bytes):
             row_has_data = False
             try:
                 # 必須フィールドの処理
+                missing_fields = []
+                invalid_fields = []
+                
                 for field in required_fields:
                     value = sheet.cell(row=row_idx, column=field_columns[field]).value
                     if value is not None:
@@ -152,21 +155,31 @@ def parse_excel(file_bytes):
                             try:
                                 vendor_id = int(float(str_value)) if str_value else 0
                                 if vendor_id == 0:
+                                    print(f"Warning: Row {row_idx} skipped - Vendor ID is 0", file=sys.stderr)
                                     raise ValueError("業者IDが0または空です")
                                 order[field] = vendor_id
                             except (ValueError, TypeError):
-                                raise ValueError(f"{row_idx}行目の「{field}」の値が正しくありません")
+                                invalid_fields.append(field)
                         # 番号の処理
                         elif field == "番号":
                             try:
                                 order[field] = int(float(str_value)) if str_value else 0
                             except (ValueError, TypeError):
-                                raise ValueError(f"{row_idx}行目の「{field}」の値が正しくありません")
+                                invalid_fields.append(field)
                         # 文字列フィールドの処理
                         else:
                             if not str_value:
-                                raise ValueError(f"{row_idx}行目の「{field}」が入力されていません")
-                            order[field] = str_value
+                                missing_fields.append(field)
+                            else:
+                                order[field] = str_value
+                
+                if missing_fields:
+                    print(f"Warning: Row {row_idx} skipped - Missing required fields: {', '.join(missing_fields)}", file=sys.stderr)
+                    continue
+                
+                if invalid_fields:
+                    print(f"Warning: Row {row_idx} skipped - Invalid data in fields: {', '.join(invalid_fields)}", file=sys.stderr)
+                    continue
                             
                 # 任意フィールドの処理
                 for field in optional_fields:
