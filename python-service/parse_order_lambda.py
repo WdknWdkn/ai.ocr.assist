@@ -93,8 +93,10 @@ def parse_excel(file_bytes):
         header_row = 2  # 2行目が必ずヘッダー行
         data_start_row = 3  # 3行目からデータ開始
 
-        # 必須フィールドの定義
-        required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容", "支払金額", "完工日", "支払日", "請求日"]
+        # 必須フィールドと任意フィールドの定義
+        required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容"]
+        optional_fields = ["支払金額", "完工日", "支払日", "請求日"]
+        all_fields = required_fields + optional_fields
         
         # ヘッダー行から列インデックスを取得
         field_columns = {}
@@ -103,20 +105,22 @@ def parse_excel(file_bytes):
             header_value = sheet.cell(row=header_row, column=col).value
             if header_value:
                 header_str = str(header_value).strip()
-                if header_str in required_fields:
+                if header_str in all_fields:
                     field_columns[header_str] = col
 
         # 必須フィールドの存在チェック
-        missing_fields = [field for field in required_fields if field not in field_columns]
+        missing_fields = [field for field in all_fields if field not in field_columns]
         if missing_fields:
             raise ValueError(f"必須項目が見つかりません: {', '.join(missing_fields)}")
 
         # データ行を読み込み (3行目から)
         orders = []
+        skipped_rows = 0
         for row_idx in range(data_start_row, sheet.max_row + 1):
-            # 業者IDが空の行はスキップ
+            # 業者IDが空または0の行はスキップ
             vendor_id_cell = sheet.cell(row=row_idx, column=field_columns["業者ID"])
-            if not vendor_id_cell.value:
+            if not vendor_id_cell.value or str(vendor_id_cell.value).strip() in ["", "0"]:
+                skipped_rows += 1
                 continue
                 
             # ヘッダー行が繰り返される場合はスキップ
@@ -126,28 +130,52 @@ def parse_excel(file_bytes):
             order = {}
             row_has_data = False
             try:
+                # 必須フィールドの処理
                 for field in required_fields:
                     value = sheet.cell(row=row_idx, column=field_columns[field]).value
                     if value is not None:
                         row_has_data = True
                         str_value = str(value).strip()
                         
-                        # 数値フィールドの処理
-                        if field in ["業者ID", "番号", "支払金額"]:
+                        # 業者IDの処理
+                        if field == "業者ID":
+                            try:
+                                vendor_id = int(float(str_value)) if str_value else 0
+                                if vendor_id == 0:
+                                    raise ValueError("業者IDが0または空です")
+                                order[field] = vendor_id
+                            except (ValueError, TypeError):
+                                raise ValueError(f"{row_idx}行目の「{field}」の値が正しくありません")
+                        # 番号の処理
+                        elif field == "番号":
                             try:
                                 order[field] = int(float(str_value)) if str_value else 0
                             except (ValueError, TypeError):
                                 raise ValueError(f"{row_idx}行目の「{field}」の値が正しくありません")
-                        # 日付フィールドの処理
-                        elif field in ["完工日", "支払日", "請求日"]:
+                        # 文字列フィールドの処理
+                        else:
                             if not str_value:
                                 raise ValueError(f"{row_idx}行目の「{field}」が入力されていません")
                             order[field] = str_value
-                        # 文字列フィールドの処理
+                            
+                # 任意フィールドの処理
+                for field in optional_fields:
+                    value = sheet.cell(row=row_idx, column=field_columns[field]).value
+                    if value is not None:
+                        str_value = str(value).strip()
+                        
+                        # 支払金額の処理
+                        if field == "支払金額":
+                            try:
+                                order[field] = int(float(str_value)) if str_value else 0
+                            except (ValueError, TypeError):
+                                order[field] = 0
+                        # 日付フィールドの処理
                         else:
-                            if not str_value and field in ["業者名", "建物名", "受付内容"]:
-                                raise ValueError(f"{row_idx}行目の「{field}」が入力されていません")
-                            order[field] = str_value
+                            if str_value and not str_value.startswith("2999"):
+                                order[field] = str_value
+                            else:
+                                order[field] = None
                 
                 # 行にデータがあり、必須フィールドが揃っている場合のみ追加
                 if row_has_data and all(field in order for field in required_fields):
@@ -161,7 +189,12 @@ def parse_excel(file_bytes):
         if not orders:
             raise ValueError("有効なデータが見つかりません。3行目以降にデータが存在することを確認してください。")
 
-        return orders
+        return {
+            "orders": orders,
+            "total_rows": sheet.max_row - data_start_row + 1,
+            "skipped_rows": skipped_rows,
+            "valid_rows": len(orders)
+        }
 
     except ValueError as e:
         raise
