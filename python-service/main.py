@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -58,30 +59,44 @@ async def parse_orders(file: UploadFile):
     if not file.filename.endswith(('.csv', '.xlsx')):
         raise HTTPException(
             status_code=400,
-            detail="ファイルの形式が正しくありません。"
+            detail="ファイルの形式が正しくありません。CSVまたはExcelファイルを選択してください。"
         )
     
     try:
         content = await file.read()
-        if len(content) > MAX_FILE_SIZE:
+        content_length = len(content)
+        print(f"Processing file: {file.filename} ({content_length} bytes)", file=sys.stderr)
+        
+        if content_length > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413,
                 detail="ファイルサイズは1MB以下にしてください。"
             )
         
         if file.filename.endswith('.xlsx'):
-            orders = parse_excel(content)
+            result = parse_excel(content)
         else:
-            orders = parse_csv(content)
+            result = parse_csv(content)
             
-        if not isinstance(orders, list):
+        if not isinstance(result, dict):
             raise ValueError("不正な出力形式です。")
             
-        return {"data": orders}
+        orders = result["orders"]
+        total_rows = result["total_rows"]
+        skipped_rows = result["skipped_rows"]
+        valid_rows = result["valid_rows"]
+        
+        print(f"Processed {total_rows} rows: {valid_rows} valid, {skipped_rows} skipped", file=sys.stderr)
+            
+        return {
+            "message": f"{valid_rows}件の有効なデータを処理しました。{skipped_rows}件のデータをスキップしました。",
+            "data": orders
+        }
     except ValueError as e:
+        print(f"Validation error: {str(e)}", file=sys.stderr)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"Error in parse_orders: {str(e)}", file=sys.stderr)
+        print(f"Error in parse_orders: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
         raise HTTPException(
             status_code=500,
             detail="ファイルの解析中にエラーが発生しました。"

@@ -83,6 +83,16 @@ def parse_csv(file_bytes):
         print(f"Error parsing CSV: {str(e)}", file=sys.stderr)
         raise ValueError("CSVファイルの解析中にエラーが発生しました")
 
+def parse_date(value):
+    """Parse date value, handling special cases"""
+    if not value:
+        return None
+    str_value = str(value).strip()
+    # Skip placeholder dates
+    if str_value.startswith("2999"):
+        return None
+    return str_value
+
 def parse_excel(file_bytes):
     """Parse Excel file content and return list of orders"""
     try:
@@ -172,10 +182,7 @@ def parse_excel(file_bytes):
                                 order[field] = 0
                         # 日付フィールドの処理
                         else:
-                            if str_value and not str_value.startswith("2999"):
-                                order[field] = str_value
-                            else:
-                                order[field] = None
+                            order[field] = parse_date(value)
                 
                 # 行にデータがあり、必須フィールドが揃っている場合のみ追加
                 if row_has_data and all(field in order for field in required_fields):
