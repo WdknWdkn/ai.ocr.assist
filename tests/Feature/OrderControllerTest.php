@@ -89,20 +89,34 @@ class OrderControllerTest extends TestCase
 
         $response->assertRedirect(route('orders.upload.form'));
         $response->assertSessionDoesntHaveErrors();
-        $response->assertSessionHas('success', '2件のデータを取り込みました。');
+        $response->assertSessionHas('success', '2件のデータを取り込みました。1件のデータをスキップしました。');
 
-        $order = Order::where([
+        // Verify first order with all fields
+        $order1 = Order::where([
             'vendor_id' => 1001,
             'vendor_name' => 'テスト業者1',
             'year_month' => '2025-02'
         ])->first();
-        
-        $this->assertNotNull($order, 'Order was not created in database');
-        $this->assertDatabaseHas('orders', [
-            'vendor_id' => 1001,
-            'vendor_name' => 'テスト業者1',
+        $this->assertNotNull($order1, 'First order was not created in database');
+        $this->assertEquals(50000, $order1->payment_amount);
+        $this->assertEquals('2025-02-01', $order1->completion_date->format('Y-m-d'));
+        $this->assertEquals('2025-02-15', $order1->payment_date->format('Y-m-d'));
+        $this->assertEquals('2025-02-10', $order1->billing_date->format('Y-m-d'));
+
+        // Verify second order with special dates (2999-12-31) as null
+        $order2 = Order::where([
+            'vendor_id' => 1002,
+            'vendor_name' => 'テスト業者2',
             'year_month' => '2025-02'
-        ]);
+        ])->first();
+        $this->assertNotNull($order2, 'Second order was not created in database');
+        $this->assertEquals(0, $order2->payment_amount);
+        $this->assertNull($order2->completion_date);
+        $this->assertNull($order2->payment_date);
+        $this->assertNull($order2->billing_date);
+
+        // Verify vendor_id = 0 was skipped
+        $this->assertEquals(0, Order::where('vendor_id', 0)->count());
     }
 
     public function test_cannot_upload_invalid_file()
