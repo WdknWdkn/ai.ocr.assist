@@ -11,6 +11,7 @@ from io import BytesIO
 def parse_csv(file_bytes):
     """Parse CSV file content and return list of orders"""
     try:
+        # Handle UTF-8 with BOM
         content = file_bytes.decode("utf-8", errors="ignore")
         if content.startswith('\ufeff'):
             content = content[1:]
@@ -18,27 +19,79 @@ def parse_csv(file_bytes):
         csv_stream = io.StringIO(content)
         reader = csv.DictReader(csv_stream)
         
-        result = []
-        for row in reader:
-            row_data = {}
-            for key in ['業者ID', '業者名', '建物名', '番号', '受付内容', '支払金額', '完工日', '支払日', '請求日']:
-                raw_value = row.get(key, '').strip()
-                
-                if key in ['業者ID', '番号', '支払金額']:
-                    try:
-                        row_data[key] = int(float(raw_value))
-                    except (ValueError, TypeError):
-                        raise ValueError(f"数値項目「{key}」の形式が正しくありません。")
-                else:
-                    row_data[key] = raw_value
-            
-            if row_data["業者ID"]:
-                result.append(row_data)
+        # Required fields check
+        required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容", "支払金額", "完工日", "支払日", "請求日"]
+        headers = [h.strip() for h in (reader.fieldnames or [])]
         
-        return result
+        # Check for missing required fields
+        missing_fields = [field for field in required_fields if field not in headers]
+        if missing_fields:
+            raise ValueError(f"必須項目が見つかりません: {', '.join(missing_fields)}")
+            
+        orders = []
+        for row_idx, row in enumerate(reader, start=2):  # start=2 because row 1 is headers
+            # Skip empty rows
+            if not any(row.values()):
+                continue
+                
+            # Skip rows without vendor ID
+            vendor_id = next((v.strip() for k, v in row.items() if k.strip() == "業者ID"), "")
+            if not vendor_id:
+                continue
+                
+            order = {}
+            try:
+                for field in required_fields:
+                    # Find the matching header (accounting for whitespace)
+                    header = next((k for k in row.keys() if k.strip() == field), None)
+                    if header is None:
+                        continue
+                        
+                    value = row[header].strip()
+                    
+                    # Numeric fields
+                    if field in ["業者ID", "番号", "支払金額"]:
+                        try:
+                            order[field] = int(float(value)) if value else 0
+                        except (ValueError, TypeError):
+                            raise ValueError(f"{row_idx}行目の「{field}」の値が正しくありません")
+                    # Date fields
+                    elif field in ["完工日", "支払日", "請求日"]:
+                        if not value:
+                            raise ValueError(f"{row_idx}行目の「{field}」が入力されていません")
+                        order[field] = value
+                    # String fields
+                    else:
+                        if not value and field in ["業者名", "建物名", "受付内容"]:
+                            raise ValueError(f"{row_idx}行目の「{field}」が入力されていません")
+                        order[field] = value
+                        
+                orders.append(order)
+            except ValueError as e:
+                raise ValueError(str(e))
+            except Exception as e:
+                raise ValueError(f"{row_idx}行目のデータ処理中にエラーが発生しました: {str(e)}")
+                
+        if not orders:
+            raise ValueError("有効なデータが見つかりません")
+            
+        return orders
+        
+    except ValueError as e:
+        raise
     except Exception as e:
         print(f"Error parsing CSV: {str(e)}", file=sys.stderr)
-        raise
+        raise ValueError("CSVファイルの解析中にエラーが発生しました")
+
+def parse_date(value):
+    """Parse date value, handling special cases"""
+    if not value:
+        return None
+    str_value = str(value).strip()
+    # Skip placeholder dates
+    if str_value.startswith("2999"):
+        return None
+    return str_value
 
 def parse_excel(file_bytes):
     """Parse Excel file content and return list of orders"""
@@ -46,90 +99,128 @@ def parse_excel(file_bytes):
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet = wb.worksheets[0]  # 先頭シートを読む想定
 
-        # ヘッダ行を探す（1～10行目）
-        header_row_idx = None
-        for row_idx, row in enumerate(sheet.iter_rows(values_only=True), start=1):
-            if row_idx > 10:
-                break
-            if row and len(row) > 0:
-                first_col_val = str(row[0]).strip() if row[0] else ""
-                if first_col_val == "業者ID":
-                    header_row_idx = row_idx
-                    break
+        # タイトル行(1行目)をスキップし、2行目をヘッダー行として使用
+        header_row = 2  # 2行目が必ずヘッダー行
+        data_start_row = 3  # 3行目からデータ開始
 
-        if header_row_idx is None:
-            raise ValueError("ヘッダ行が見つかりませんでした(1～10行目の1カラム目に「業者ID」がありません)")
+        # 必須フィールドと任意フィールドの定義
+        required_fields = ["業者ID", "業者名", "建物名", "番号", "受付内容"]
+        optional_fields = ["支払金額", "完工日", "支払日", "請求日"]
+        all_fields = required_fields + optional_fields
+        
+        # ヘッダー行から列インデックスを取得
+        field_columns = {}
+        # ヘッダー行の全列をチェック
+        for col in range(1, sheet.max_column + 1):
+            header_value = sheet.cell(row=header_row, column=col).value
+            if header_value:
+                header_str = str(header_value).strip()
+                if header_str in all_fields:
+                    field_columns[header_str] = col
 
-        # ヘッダ行の列インデックスを取得
-        header_row = list(sheet.iter_rows(min_row=header_row_idx, max_row=header_row_idx, values_only=True))[0]
-        headers_map = {}
-        for col_idx, val in enumerate(header_row):
-            if val is not None:
-                val_str = str(val).strip()
-                headers_map[val_str] = col_idx
+        # 必須フィールドの存在チェック
+        missing_fields = [field for field in all_fields if field not in field_columns]
+        if missing_fields:
+            raise ValueError(f"必須項目が見つかりません: {', '.join(missing_fields)}")
 
-        # データ行を読み込み
-        result = []
-        for row in sheet.iter_rows(min_row=header_row_idx + 1, values_only=True):
-            row_data = {}
-            for key in ['業者ID', '業者名', '建物名', '番号', '受付内容', '支払金額', '完工日', '支払日', '請求日']:
-                idx = headers_map.get(key)
-                if idx is not None and idx < len(row):
-                    raw_value = str(row[idx] or '').strip()
-                    
-                    if key in ['業者ID', '番号', '支払金額']:
-                        try:
-                            row_data[key] = int(float(raw_value))
-                        except (ValueError, TypeError):
-                            raise ValueError(f"数値項目「{key}」の形式が正しくありません。")
-                    else:
-                        row_data[key] = raw_value
-                else:
-                    row_data[key] = ''
+        # データ行を読み込み (3行目から)
+        orders = []
+        skipped_rows = 0
+        for row_idx in range(data_start_row, sheet.max_row + 1):
+            # 業者IDが空または0の行はスキップ
+            vendor_id_cell = sheet.cell(row=row_idx, column=field_columns["業者ID"])
+            if not vendor_id_cell.value or str(vendor_id_cell.value).strip() in ["", "0"]:
+                skipped_rows += 1
+                continue
+                
+            # ヘッダー行が繰り返される場合はスキップ
+            if str(vendor_id_cell.value).strip() == "業者ID":
+                continue
 
-            if row_data["業者ID"]:
-                result.append(row_data)
+            order = {}
+            row_has_data = False
+            try:
+                # 必須フィールドの処理
+                missing_fields = []
+                invalid_fields = []
+                
+                for field in required_fields:
+                    value = sheet.cell(row=row_idx, column=field_columns[field]).value
+                    if value is not None:
+                        row_has_data = True
+                        str_value = str(value).strip()
+                        
+                        # 業者IDの処理
+                        if field == "業者ID":
+                            try:
+                                vendor_id = int(float(str_value)) if str_value else 0
+                                if vendor_id == 0:
+                                    print(f"Warning: Row {row_idx} skipped - Vendor ID is 0", file=sys.stderr)
+                                    raise ValueError("業者IDが0または空です")
+                                order[field] = vendor_id
+                            except (ValueError, TypeError):
+                                invalid_fields.append(field)
+                        # 番号の処理
+                        elif field == "番号":
+                            try:
+                                order[field] = int(float(str_value)) if str_value else 0
+                            except (ValueError, TypeError):
+                                invalid_fields.append(field)
+                        # 文字列フィールドの処理
+                        else:
+                            if not str_value:
+                                missing_fields.append(field)
+                            else:
+                                order[field] = str_value
+                
+                if missing_fields:
+                    print(f"Warning: Row {row_idx} skipped - Missing required fields: {', '.join(missing_fields)}", file=sys.stderr)
+                    continue
+                
+                if invalid_fields:
+                    print(f"Warning: Row {row_idx} skipped - Invalid data in fields: {', '.join(invalid_fields)}", file=sys.stderr)
+                    continue
+                            
+                # 任意フィールドの処理
+                for field in optional_fields:
+                    value = sheet.cell(row=row_idx, column=field_columns[field]).value
+                    if value is not None:
+                        str_value = str(value).strip()
+                        
+                        # 支払金額の処理
+                        if field == "支払金額":
+                            try:
+                                order[field] = int(float(str_value)) if str_value else 0
+                            except (ValueError, TypeError):
+                                order[field] = 0
+                        # 日付フィールドの処理
+                        else:
+                            order[field] = parse_date(value)
+                
+                # 行にデータがあり、必須フィールドが揃っている場合のみ追加
+                if row_has_data and all(field in order for field in required_fields):
 
-        return result
+                    orders.append(order)
+            except ValueError as e:
+                raise ValueError(str(e))
+            except Exception as e:
+                raise ValueError(f"{row_idx}行目のデータ処理中にエラーが発生しました: {str(e)}")
+
+        if not orders:
+            raise ValueError("有効なデータが見つかりません。3行目以降にデータが存在することを確認してください。")
+
+        return {
+            "orders": orders,
+            "total_rows": sheet.max_row - data_start_row + 1,
+            "skipped_rows": skipped_rows,
+            "valid_rows": len(orders)
+        }
+
+    except ValueError as e:
+        raise
     except Exception as e:
         print(f"Error parsing Excel: {str(e)}", file=sys.stderr)
-        raise
+        raise ValueError("Excelファイルの解析中にエラーが発生しました")
 
 if __name__ == "__main__":
-    try:
-        if len(sys.argv) != 3:
-            print(json.dumps({
-                "error": "ファイルの形式が正しくありません。"
-            }, ensure_ascii=False))
-            sys.exit(1)
-
-        temp_file_path = sys.argv[1]
-        filename = sys.argv[2]
-
-        try:
-            with open(temp_file_path, 'rb') as f:
-                file_bytes = f.read()
-        except FileNotFoundError:
-            print(json.dumps({
-                "error": "ファイルが見つかりません。"
-            }, ensure_ascii=False))
-            sys.exit(1)
-
-        try:
-            if filename.lower().endswith((".xlsx", ".xls")):
-                result = parse_excel(file_bytes)
-            else:
-                result = parse_csv(file_bytes)
-
-            print(json.dumps(result, ensure_ascii=False))
-            sys.exit(0)
-        except Exception as e:
-            print(json.dumps({
-                "error": f"ファイルの解析中にエラーが発生しました: {str(e)}"
-            }, ensure_ascii=False))
-            sys.exit(1)
-    except Exception as e:
-        print(json.dumps({
-            "error": f"予期せぬエラーが発生しました: {str(e)}"
-        }, ensure_ascii=False))
-        sys.exit(1)
+    print("This module is now used as a library and should not be run directly.")

@@ -33,6 +33,13 @@ export default function Upload({ flash }) {
                                     {flash.success}
                                 </div>
                             )}
+                            {flash?.warnings && flash.warnings.length > 0 && (
+                                <div className="mb-4 rounded bg-yellow-100 p-4 text-yellow-700">
+                                    {flash.warnings.map((warning, index) => (
+                                        <div key={index}>{warning}</div>
+                                    ))}
+                                </div>
+                            )}
                             {errors.file && (
                                 <div className="mb-4 rounded bg-red-100 p-4 text-red-700">
                                     {errors.file}

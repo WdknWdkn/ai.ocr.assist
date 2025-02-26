@@ -1,4 +1,6 @@
 import os
+import sys
+import traceback
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -32,16 +34,8 @@ def validate_file_size(file_size: int):
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large (max 1MB)")
 
-async def parse_excel_or_csv(file: UploadFile) -> dict:
-    content = await file.read()
-    validate_file_size(len(content))
-    
-    if file.filename.endswith('.csv'):
-        df = pd.read_csv(io.BytesIO(content))
-    else:
-        df = pd.read_excel(io.BytesIO(content))
-    
-    return df.to_dict('records')[0] if not df.empty else {}
+from parse_order_lambda import parse_csv, parse_excel
+
 
 async def extract_text_from_pdf(file: UploadFile, use_ocr: bool = False) -> str:
     content = await file.read()
@@ -63,10 +57,50 @@ async def extract_text_from_pdf(file: UploadFile, use_ocr: bool = False) -> str:
 @app.post("/api/v1/orders/parse")
 async def parse_orders(file: UploadFile):
     if not file.filename.endswith(('.csv', '.xlsx')):
-        raise HTTPException(status_code=400, detail="Invalid file format. Must be CSV or Excel")
+        raise HTTPException(
+            status_code=400,
+            detail="ファイルの形式が正しくありません。CSVまたはExcelファイルを選択してください。"
+        )
     
-    data = await parse_excel_or_csv(file)
-    return {"message": "Orders parsed successfully", "data": data}
+    try:
+        content = await file.read()
+        content_length = len(content)
+        print(f"Processing file: {file.filename} ({content_length} bytes)", file=sys.stderr)
+        
+        if content_length > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="ファイルサイズは1MB以下にしてください。"
+            )
+        
+        if file.filename.endswith('.xlsx'):
+            result = parse_excel(content)
+        else:
+            result = parse_csv(content)
+            
+        if not isinstance(result, dict):
+            raise ValueError("不正な出力形式です。")
+            
+        orders = result["orders"]
+        total_rows = result["total_rows"]
+        skipped_rows = result["skipped_rows"]
+        valid_rows = result["valid_rows"]
+        
+        print(f"Processed {total_rows} rows: {valid_rows} valid, {skipped_rows} skipped", file=sys.stderr)
+            
+        return {
+            "message": f"{valid_rows}件の有効なデータを処理しました。{skipped_rows}件のデータをスキップしました。",
+            "data": orders
+        }
+    except ValueError as e:
+        print(f"Validation error: {str(e)}", file=sys.stderr)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error in parse_orders: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+        raise HTTPException(
+            status_code=500,
+            detail="ファイルの解析中にエラーが発生しました。"
+        )
 
 @app.post("/api/v1/invoices/parse")
 async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = False):
@@ -79,18 +113,48 @@ async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = False):
 @app.post("/api/v1/match")
 async def match_documents(orders_file: UploadFile, invoices_file: UploadFile):
     if not orders_file.filename.endswith(('.csv', '.xlsx')):
-        raise HTTPException(status_code=400, detail="Invalid orders file format")
+        raise HTTPException(
+            status_code=400,
+            detail="ファイルの形式が正しくありません。"
+        )
     if not invoices_file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Invalid invoice file format")
+        raise HTTPException(
+            status_code=400,
+            detail="PDFファイルを選択してください。"
+        )
     
-    orders_data = await parse_excel_or_csv(orders_file)
-    invoice_text = await extract_text_from_pdf(invoices_file, use_ocr=True)
-    
-    return {
-        "message": "Documents matched successfully",
-        "orders": orders_data,
-        "invoice_text": invoice_text
-    }
+    try:
+        content = await orders_file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="ファイルサイズは1MB以下にしてください。"
+            )
+        
+        if orders_file.filename.endswith('.xlsx'):
+            orders_data = parse_excel(content)
+        else:
+            orders_data = parse_csv(content)
+            
+        invoice_text = await extract_text_from_pdf(invoices_file, use_ocr=True)
+        
+        return {
+            "data": {
+                "orders": orders_data,
+                "invoice_text": invoice_text
+            }
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="ファイルの解析中にエラーが発生しました。"
+        )
+
+@app.get("/api/v1/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
