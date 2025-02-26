@@ -22,6 +22,28 @@ class OrderController extends Controller
         $this->parser = $parser;
     }
 
+    public function index(Request $request)
+    {
+        $query = Order::query();
+        
+        if ($request->filled('year_month')) {
+            $query->where('year_month', 'like', '%' . $request->year_month . '%');
+        }
+        
+        if ($request->filled('vendor_name')) {
+            $query->where('vendor_name', 'like', '%' . $request->vendor_name . '%');
+        }
+        
+        $orders = $query->orderBy('created_at', 'desc')
+            ->paginate(15)
+            ->withQueryString();
+            
+        return Inertia::render('Orders/Index', [
+            'orders' => $orders,
+            'filters' => $request->only(['year_month', 'vendor_name'])
+        ]);
+    }
+
     public function showUploadForm(): Response
     {
         return Inertia::render('Orders/Upload');
