@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Services\PythonOrderParser;
+use App\Services\OrderSearchService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
