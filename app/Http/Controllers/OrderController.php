@@ -24,15 +24,10 @@ class OrderController extends Controller
 
     public function index(Request $request)
     {
+        $searchService = new OrderSearchService();
         $query = Order::query();
         
-        if ($request->filled('year_month')) {
-            $query->where('year_month', 'like', '%' . $request->year_month . '%');
-        }
-        
-        if ($request->filled('vendor_name')) {
-            $query->where('vendor_name', 'like', '%' . $request->vendor_name . '%');
-        }
+        $query = $searchService->applyFilters($query, $request->only(['year_month', 'vendor_name']));
         
         $orders = $query->orderBy('created_at', 'desc')
             ->paginate(15)

@@ -1,4 +1,4 @@
-import { Head, useForm, Link } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import {
     useReactTable,
@@ -7,6 +7,7 @@ import {
     flexRender,
 } from '@tanstack/react-table';
 import { useState } from 'react';
+import OrderSearchForm from '@/Components/OrderSearchForm';
 
 const columns = [
     { header: '年月', accessorKey: 'year_month' },
@@ -29,11 +30,6 @@ const columns = [
 
 export default function Index({ orders, filters }) {
     const [sorting, setSorting] = useState([]);
-    const { data, setData, get } = useForm({
-        year_month: filters.year_month || '',
-        vendor_name: filters.vendor_name || ''
-    });
-
     const table = useReactTable({
         data: orders.data,
         columns,
@@ -42,11 +38,6 @@ export default function Index({ orders, filters }) {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
     });
-
-    const handleSearch = (e) => {
-        e.preventDefault();
-        get(route('orders.index'));
-    };
 
     return (
         <AuthenticatedLayout
@@ -57,28 +48,7 @@ export default function Index({ orders, filters }) {
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="p-6">
-                            <form onSubmit={handleSearch} className="mb-6 flex gap-4">
-                                <input
-                                    type="text"
-                                    value={data.year_month}
-                                    onChange={e => setData('year_month', e.target.value)}
-                                    placeholder="年月"
-                                    className="rounded border px-3 py-2"
-                                />
-                                <input
-                                    type="text"
-                                    value={data.vendor_name}
-                                    onChange={e => setData('vendor_name', e.target.value)}
-                                    placeholder="業者名"
-                                    className="rounded border px-3 py-2"
-                                />
-                                <button
-                                    type="submit"
-                                    className="rounded bg-gray-800 px-4 py-2 text-white hover:bg-gray-700"
-                                >
-                                    検索
-                                </button>
-                            </form>
+                            <OrderSearchForm filters={filters} />
 
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
