@@ -50,21 +50,29 @@ def extract_text_from_pdf(pdf_bytes, use_ocr=True):
     """
     PDFから文字を抽出する。
     画像PDFの場合、use_ocr=True で Tesseract OCRを呼び出す。
+    日本語テキストの場合は常にOCRを試みる。
     """
     text_all = ""
+    is_japanese = False
 
     # First try normal PDF text extraction
     try:
         reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
         for page in reader.pages:
             extracted = page.extract_text()
-            if extracted:
+            if extracted and extracted.strip():
                 text_all += extracted + "\n"
+                # Check if text contains Japanese characters
+                if any(ord(c) > 0x3000 for c in extracted):
+                    is_japanese = True
     except Exception as e:
         print(f"PDF text extraction failed: {e}")
         
-    # If no text was extracted or OCR is forced, try OCR
-    if not text_all.strip() or use_ocr:
+    # Try OCR if:
+    # 1. No text was extracted, or
+    # 2. OCR is forced, or
+    # 3. Japanese text was detected
+    if not text_all.strip() or use_ocr or is_japanese:
 
         # OCRを実行 (pdf2image + pytesseract)
         images = convert_from_bytes(pdf_bytes)
@@ -81,12 +89,29 @@ def extract_text_from_pdf(pdf_bytes, use_ocr=True):
             # 分割後バイナリを順次OCRして連結
             for sbin in splitted_binaries:
                 try:
-                    text_page = pytesseract.image_to_string(Image.open(io.BytesIO(sbin)), lang='eng+jpn')
+                    # First try Japanese + English OCR with horizontal text
+                    text_page = pytesseract.image_to_string(
+                        Image.open(io.BytesIO(sbin)), 
+                        lang='jpn+eng',
+                        config='--psm 6'  # Assume uniform block of text
+                    )
+                    
+                    # If no text found or very little text, try vertical Japanese text
+                    if len(text_page.strip()) < 10:
+                        text_page_vert = pytesseract.image_to_string(
+                            Image.open(io.BytesIO(sbin)), 
+                            lang='jpn_vert+jpn',
+                            config='--psm 5'  # Assume vertical block of text
+                        )
+                        if len(text_page_vert.strip()) > len(text_page.strip()):
+                            text_page = text_page_vert
+                            
                 except Exception as e:
                     print(f"OCR error: {e}")
                     text_page = ""
                 
-                text_all += text_page + "\n"
+                if text_page.strip():
+                    text_all += text_page.strip() + "\n"
 
     return text_all
 
