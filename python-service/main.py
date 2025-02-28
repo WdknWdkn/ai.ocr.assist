@@ -143,9 +143,17 @@ async def parse_invoice(file: UploadFile):
         }, None)
 
         parsed_result = json.loads(result["body"])
+        invoice_data = parsed_result.get("invoice_data", {})
+        
+        if not invoice_data:
+            raise HTTPException(
+                status_code=400,
+                detail="請求書からデータを抽出できませんでした。"
+            )
+
         return {
             "message": "請求書の解析が完了しました。",
-            "invoice_data": parsed_result.get("data", {})
+            "invoice_data": invoice_data
         }
     except HTTPException:
         raise
