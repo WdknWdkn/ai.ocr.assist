@@ -2,6 +2,7 @@
 import json
 import base64
 import io
+import re
 import openai
 import PyPDF2
 import pytesseract
