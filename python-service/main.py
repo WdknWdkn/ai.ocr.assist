@@ -36,8 +36,9 @@ def validate_file_size(file_size: int):
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large (max 1MB)")
 
-from . import parse_invoice_lambda
+import parse_invoice_lambda
 from parse_order_lambda import parse_csv, parse_excel
+import re
 
 
 async def extract_text_from_pdf(file: UploadFile, use_ocr: bool = False) -> str:

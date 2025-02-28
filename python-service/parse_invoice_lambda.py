@@ -14,11 +14,17 @@ def lambda_handler(event, context):
     2) use_ocr=Trueの場合はOCR + ChatGPT でJSON化
     3) JSONレスポンスを返す
     """
-    openai.api_key = "YOUR_OPENAI_API_KEY"
+    openai_api_key = event.get("openai_api_key")
+    if not openai_api_key:
+        raise ValueError("OpenAI API key is required")
+    openai.api_key = openai_api_key
 
     file_bytes_b64 = event.get("file_bytes", "")
+    if not file_bytes_b64:
+        raise ValueError("File bytes are required")
+    
     file_bytes = base64.b64decode(file_bytes_b64)
-    use_ocr = event.get("use_ocr", False)
+    use_ocr = event.get("use_ocr", True)  # Default to True for auto-detection
 
     # PDFをテキスト化
     raw_text = extract_text_from_pdf(file_bytes, use_ocr)
@@ -39,31 +45,25 @@ def lambda_handler(event, context):
         })
     }
 
-def extract_text_from_pdf(pdf_bytes, use_ocr=False):
+def extract_text_from_pdf(pdf_bytes, use_ocr=True):
     """
     PDFから文字を抽出する。
     画像PDFの場合、use_ocr=True で Tesseract OCRを呼び出す。
     """
     text_all = ""
 
-    if not use_ocr:
-        # テキストPDFをPyPDF2で抽出
-        try:
-            reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-            for page in reader.pages:
-                text_all += page.extract_text() or ""
-        except:
-            # 画像PDFなどで失敗した場合は空のまま
-            pass
-    else:
-
-        try:
-            reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-            for page in reader.pages:
-                text_all += page.extract_text() or ""
-        except:
-            # 画像PDFなどで失敗した場合は空のまま
-            pass
+    # First try normal PDF text extraction
+    try:
+        reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
+        for page in reader.pages:
+            extracted = page.extract_text()
+            if extracted:
+                text_all += extracted + "\n"
+    except Exception as e:
+        print(f"PDF text extraction failed: {e}")
+        
+    # If no text was extracted or OCR is forced, try OCR
+    if not text_all.strip() or use_ocr:
 
         # OCRを実行 (pdf2image + pytesseract)
         images = convert_from_bytes(pdf_bytes)
