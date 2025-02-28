@@ -43,14 +43,31 @@ class PythonInvoiceParser
 
             $data = $response->json();
             Log::debug('Parsed response:', [
-                'data' => $data
+                'data' => $data,
+                'status' => $response->status(),
+                'headers' => $response->headers()
             ]);
 
-            if (!isset($data['invoice_data']) || !is_array($data['invoice_data'])) {
-                Log::error('Invalid invoice response format:', [
+            if (!isset($data['invoice_data'])) {
+                Log::error('Missing invoice_data in response:', [
                     'data' => $data
                 ]);
-                throw new RuntimeException('請求書データの解析に失敗しました。');
+                throw new RuntimeException('請求書データが見つかりませんでした。');
+            }
+
+            if (!is_array($data['invoice_data'])) {
+                Log::error('Invalid invoice_data format:', [
+                    'data' => $data,
+                    'type' => gettype($data['invoice_data'])
+                ]);
+                throw new RuntimeException('請求書データの形式が正しくありません。');
+            }
+
+            if (empty($data['invoice_data'])) {
+                Log::warning('Empty invoice data:', [
+                    'data' => $data
+                ]);
+                throw new RuntimeException('請求書からデータを抽出できませんでした。');
             }
 
             return $data['invoice_data'];
