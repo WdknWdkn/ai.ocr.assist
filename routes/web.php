@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::prefix('orders')->group(function () {
+        Route::get('/', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/upload', [OrderController::class, 'showUploadForm'])->name('orders.upload.form');
         Route::post('/upload', [OrderController::class, 'upload'])->name('orders.upload');
     });

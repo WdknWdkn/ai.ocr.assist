@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Services\PythonOrderParser;
+use App\Services\OrderSearchService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,23 @@ class OrderController extends Controller
     public function __construct(PythonOrderParser $parser)
     {
         $this->parser = $parser;
+    }
+
+    public function index(Request $request)
+    {
+        $searchService = new OrderSearchService();
+        $query = Order::query();
+        
+        $query = $searchService->applyFilters($query, $request->only(['year_month', 'vendor_name']));
+        
+        $orders = $query->orderBy('created_at', 'desc')
+            ->paginate(15)
+            ->withQueryString();
+            
+        return Inertia::render('Orders/Index', [
+            'orders' => $orders,
+            'filters' => $request->only(['year_month', 'vendor_name'])
+        ]);
     }
 
     public function showUploadForm(): Response
