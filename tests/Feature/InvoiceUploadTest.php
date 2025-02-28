@@ -30,7 +30,22 @@ class InvoiceUploadTest extends TestCase
     {
         Storage::fake('local');
         
-        $file = UploadedFile::fake()->create('invoice.pdf', 100);
+        // Create a PDF file with some content
+        $pdfPath = storage_path('app/test.pdf');
+        $pdf = new \FPDF();
+        $pdf->AddPage();
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->Cell(0, 10, 'Test Invoice', 0, 1, 'C');
+        $pdf->Cell(0, 10, '請求書テスト', 0, 1, 'C');
+        $pdf->Output($pdfPath, 'F');
+        
+        $file = new UploadedFile(
+            $pdfPath,
+            'invoice.pdf',
+            'application/pdf',
+            null,
+            true
+        );
         
         $response = $this->actingAs($this->user)
             ->post(route('invoices.upload'), [
@@ -39,6 +54,8 @@ class InvoiceUploadTest extends TestCase
             
         $response->assertRedirect();
         $response->assertSessionHas('success');
+        
+        unlink($pdfPath);
     }
 
     public function test_validates_file_type()

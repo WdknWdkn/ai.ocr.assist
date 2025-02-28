@@ -8,6 +8,7 @@ import pandas as pd
 import PyPDF2
 from pdf2image import convert_from_bytes
 import pytesseract
+from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -136,25 +137,34 @@ async def parse_invoice(file: UploadFile):
                 detail="OpenAI APIキーが設定されていません。"
             )
 
-        result = parse_invoice_lambda.lambda_handler({
-            "file_bytes": file_bytes_b64,
-            "openai_api_key": openai_api_key,
-            "use_ocr": True  # Auto-detect in lambda function
-        }, None)
+        try:
+            # Process with lambda handler
+            result = parse_invoice_lambda.lambda_handler({
+                "file_bytes": file_bytes_b64,
+                "openai_api_key": openai_api_key,
+                "use_ocr": True  # Auto-detect in lambda function
+            }, None)
 
-        parsed_result = json.loads(result["body"])
-        invoice_data = parsed_result.get("invoice_data", {})
-        
-        if not invoice_data:
+            parsed_result = json.loads(result["body"])
+            invoice_data = parsed_result.get("invoice_data", [])
+            
+            if not invoice_data:
+                raise ValueError("請求書からデータを抽出できませんでした。")
+
+            return {
+                "message": parsed_result.get("message", "請求書の解析が完了しました。"),
+                "invoice_data": invoice_data,
+                "text": parsed_result.get("text", "")
+            }
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            print(f"Error in parse_invoice: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
             raise HTTPException(
-                status_code=400,
-                detail="請求書からデータを抽出できませんでした。"
+                status_code=500,
+                detail="ファイルの解析中にエラーが発生しました。"
             )
-
-        return {
-            "message": "請求書の解析が完了しました。",
-            "invoice_data": invoice_data
-        }
     except HTTPException:
         raise
     except Exception as e:

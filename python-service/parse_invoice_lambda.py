@@ -29,20 +29,29 @@ def lambda_handler(event, context):
 
     # PDFをテキスト化
     raw_text = extract_text_from_pdf(file_bytes, use_ocr)
+    if not raw_text or not raw_text.strip():
+        raise ValueError("テキストを抽出できませんでした。")
 
     # ChatGPTでJSON化
     unified_text = unify_text_via_openai(raw_text)
 
     # JSONパース
     structured_data = extract_fields_from_text(unified_text)
+    if not structured_data:
+        raise ValueError("請求書からデータを抽出できませんでした。")
 
     # 14項目にマッピング
     invoice_data = parse_invoice_data(structured_data)
+    if not invoice_data:
+        raise ValueError("請求書からデータを抽出できませんでした。")
 
+    # Return success response
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "invoice_data": invoice_data
+            "message": "請求書の解析が完了しました。",
+            "invoice_data": invoice_data,
+            "text": raw_text
         })
     }
 
@@ -158,11 +167,11 @@ def unify_text_via_openai(raw_text):
     """
     大幅な表記ゆれがあるテキストを OpenAI の GPT-4 モデルで整形・標準化。
     """
+    if not raw_text or not raw_text.strip():
+        raise ValueError("テキストが空です。")
+
     if not openai.api_key:
         raise ValueError("OpenAI APIキーが設定されていません。")
-
-    print("raw_text=================================")
-    print(raw_text)
 
     try:
         response = openai.chat.completions.create(
@@ -170,7 +179,7 @@ def unify_text_via_openai(raw_text):
             messages=[
                 {
                     "role": "system", 
-                    "content": "あなたは優秀なアシスタントです。"
+                    "content": "あなたは請求書データを抽出する専門家です。"
                 },
                 {
                     "role": "user",
@@ -180,6 +189,7 @@ def unify_text_via_openai(raw_text):
                     ・純粋なjson形式のみで回答してください
                     ・内容が重複している情報は不要です
                     ・全角スペース、半角スペースは各項目の値に含めないでください
+                    ・テキストから情報が抽出できない場合は空の配列を返してください
                     ---回答フォーマット（例）:
                     [
                         {{
