@@ -138,9 +138,6 @@ def unify_text_via_openai(raw_text):
     print("raw_text=================================")
     print(raw_text)
 
-    print("raw_text=================================")
-    print(raw_text)
-
     try:
         response = openai.chat.completions.create(
             model="gpt-4",
