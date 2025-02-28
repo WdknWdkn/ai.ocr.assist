@@ -42,6 +42,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 >
                                     発注一覧
                                 </NavLink>
+                                <NavLink
+                                    href={route('invoices.upload.form')}
+                                    active={route().current('invoices.upload.form')}
+                                >
+                                    請求書アップロード
+                                </NavLink>
                             </div>
                         </div>
 
@@ -157,6 +163,12 @@ export default function AuthenticatedLayout({ header, children }) {
                             active={route().current('orders.index')}
                         >
                             発注一覧
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route('invoices.upload.form')}
+                            active={route().current('invoices.upload.form')}
+                        >
+                            請求書アップロード
                         </ResponsiveNavLink>
                     </div>
 
