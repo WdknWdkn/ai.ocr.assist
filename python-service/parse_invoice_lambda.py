@@ -129,22 +129,21 @@ def split_image_if_needed(image_binary):
 
 # --- OpenAI 表記ゆれ補正関数 ---
 def unify_text_via_openai(raw_text):
-        
     """
-    大幅な表記ゆれがあるテキストを OpenAI の 'o1' モデルで整形・標準化。
+    大幅な表記ゆれがあるテキストを OpenAI の GPT-4 モデルで整形・標準化。
     """
-    openai.api_key = OPENAI_API_KEY
-
     if not openai.api_key:
-        print("Warning: OPENAI_API_KEY is not set. Return original text.")
-        return raw_text
+        raise ValueError("OpenAI APIキーが設定されていません。")
+
+    print("raw_text=================================")
+    print(raw_text)
 
     print("raw_text=================================")
     print(raw_text)
 
     try:
         response = openai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[
                 {
                     "role": "system", 
