@@ -1,16 +1,18 @@
 import os
 import sys
 import traceback
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-from typing import Optional
+import base64
 import json
+import io
 import pandas as pd
 import PyPDF2
 from pdf2image import convert_from_bytes
 import pytesseract
-import io
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from typing import Optional
+import uvicorn
 
 # Import mock OpenAI for testing
 if not os.getenv("OPENAI_API_KEY"):
