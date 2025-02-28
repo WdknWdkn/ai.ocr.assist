@@ -41,15 +41,19 @@ class PythonInvoiceParser
                 throw new RuntimeException($error);
             }
 
-            $data = $response->json('invoice_data');
-            if (!is_array($data)) {
+            $data = $response->json();
+            Log::debug('Parsed response:', [
+                'data' => $data
+            ]);
+
+            if (!isset($data['invoice_data']) || !is_array($data['invoice_data'])) {
                 Log::error('Invalid invoice response format:', [
                     'data' => $data
                 ]);
-                throw new RuntimeException('不正な出力形式です。');
+                throw new RuntimeException('請求書データの解析に失敗しました。');
             }
 
-            return $data;
+            return $data['invoice_data'];
         } catch (ConnectionException $e) {
             Log::error('Invoice API connection failed:', [
                 'error' => $e->getMessage()

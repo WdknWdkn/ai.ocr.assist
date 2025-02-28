@@ -141,7 +141,11 @@ async def parse_invoice(file: UploadFile):
             "use_ocr": True  # Auto-detect in lambda function
         }, None)
 
-        return json.loads(result["body"])
+        parsed_result = json.loads(result["body"])
+        return {
+            "message": "請求書の解析が完了しました。",
+            "invoice_data": parsed_result.get("data", {})
+        }
     except HTTPException:
         raise
     except Exception as e:
