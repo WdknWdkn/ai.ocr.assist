@@ -15,3 +15,6 @@ venv/
 *.pyc
 *.pyo
 *.pyd
+.env.python
+test.csv
+public/hot

@@ -42,7 +42,8 @@ class InvoiceController extends Controller
             $data = $this->parser->parse($content, $file->getClientOriginalName());
 
             return redirect()->back()
-                ->with('invoice_data', $data);
+                ->with('success', '請求書の解析が完了しました。')
+                ->with('invoice_data', $data['invoice_data']);
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['file' => $e->getMessage()]);
         }
