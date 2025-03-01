@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
@@ -28,6 +29,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/upload', [OrderController::class, 'showUploadForm'])->name('orders.upload.form');
         Route::post('/upload', [OrderController::class, 'upload'])->name('orders.upload');
+    });
+
+    Route::prefix('invoices')->group(function () {
+        Route::get('/upload', [InvoiceController::class, 'showUploadForm'])->name('invoices.upload.form');
+        Route::post('/upload', [InvoiceController::class, 'upload'])->name('invoices.upload');
     });
 });
 
