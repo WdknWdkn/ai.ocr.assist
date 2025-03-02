@@ -179,10 +179,10 @@ def unify_text_via_openai(raw_text):
     if not raw_text or not raw_text.strip():
         raise ValueError("テキストが空です。")
 
-    if not openai.api_key:
-        raise ValueError("OpenAI APIキーが設定されていません。")
-
     try:
+        if not openai.api_key:
+            raise ValueError("OpenAI APIキーが設定されていません。")
+            
         response = openai.chat.completions.create(
             model="gpt-4",
             messages=[
