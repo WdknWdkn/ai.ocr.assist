@@ -32,9 +32,18 @@ services:
             - '${PYTHON_PORT:-8000}:8000'
         volumes:
             - './python-service:/app'
+            - './python-service/.env:/app/.env'
+        env_file:
+            - .env.python
         environment:
-            - OPENAI_API_KEY=${OPENAI_API_KEY}
             - PYTHONUNBUFFERED=1
+            - PYTHONIOENCODING=utf-8
+            - PYTHONUTF8=1
+        deploy:
+            resources:
+                limits:
+                    memory: 2G
+                    cpus: '1.5'
         networks:
             - sail
         healthcheck:

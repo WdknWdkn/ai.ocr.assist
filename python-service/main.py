@@ -1,16 +1,19 @@
 import os
 import sys
 import traceback
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-from typing import Optional
+import base64
 import json
+import io
 import pandas as pd
 import PyPDF2
 from pdf2image import convert_from_bytes
 import pytesseract
-import io
+from PIL import Image
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from typing import Optional
+import uvicorn
 
 # Import mock OpenAI for testing
 if not os.getenv("OPENAI_API_KEY"):
@@ -34,7 +37,9 @@ def validate_file_size(file_size: int):
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large (max 1MB)")
 
+import parse_invoice_lambda
 from parse_order_lambda import parse_csv, parse_excel
+import re
 
 
 async def extract_text_from_pdf(file: UploadFile, use_ocr: bool = False) -> str:
@@ -103,12 +108,81 @@ async def parse_orders(file: UploadFile):
         )
 
 @app.post("/api/v1/invoices/parse")
-async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = False):
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Invalid file format. Must be PDF")
-    
-    text = await extract_text_from_pdf(file, use_ocr)
-    return {"message": "Invoice parsed successfully", "text": text}
+async def parse_invoice(file: UploadFile):
+    """
+    PDFまたは画像ファイルを受け取り、請求書データを抽出する
+    """
+    if not file.filename.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')):
+        raise HTTPException(
+            status_code=400,
+            detail="ファイルの形式が正しくありません。PDF、JPG、またはPNG形式のファイルを選択してください。"
+        )
+
+    try:
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="ファイルサイズは1MB以下にしてください。"
+            )
+
+        # Convert to base64
+        file_bytes_b64 = base64.b64encode(content).decode()
+
+        # Get OpenAI API key from environment
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="OpenAI APIキーが設定されていません。"
+            )
+
+        try:
+            # Process with lambda handler
+            result = parse_invoice_lambda.lambda_handler({
+                "file_bytes": file_bytes_b64,
+                "openai_api_key": openai_api_key,
+                "use_ocr": True  # Auto-detect in lambda function
+            }, None)
+
+            # Get OpenAI API key from environment
+            openai_api_key = os.getenv("OPENAI_API_KEY")
+            if not openai_api_key:
+                raise HTTPException(
+                    status_code=500,
+                    detail="OpenAI APIキーが設定されていません。"
+                )
+
+            # Process with lambda handler
+            result = parse_invoice_lambda.lambda_handler({
+                "file_bytes": file_bytes_b64,
+                "openai_api_key": openai_api_key,
+                "use_ocr": True  # Auto-detect in lambda function
+            }, None)
+
+            parsed_result = json.loads(result["body"])
+            return {
+                "message": parsed_result.get("message", "請求書の解析が完了しました。"),
+                "invoice_data": parsed_result.get("invoice_data", []),
+                "text": parsed_result.get("text", "")
+            }
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            print(f"Error in parse_invoice: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+            raise HTTPException(
+                status_code=500,
+                detail="ファイルの解析中にエラーが発生しました。"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in parse_invoice: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+        raise HTTPException(
+            status_code=500,
+            detail="ファイルの解析中にエラーが発生しました。"
+        )
 
 @app.post("/api/v1/match")
 async def match_documents(orders_file: UploadFile, invoices_file: UploadFile):
@@ -157,4 +231,12 @@ async def health_check():
     return {"status": "healthy"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        timeout_keep_alive=75,
+        workers=2,
+        limit_concurrency=4,
+        timeout_graceful_shutdown=10
+    )
