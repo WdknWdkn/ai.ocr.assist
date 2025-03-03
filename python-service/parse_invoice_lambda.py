@@ -164,7 +164,7 @@ def optimize_image(img):
     if width > 2000 or height > 2000:
         ratio = min(2000/width, 2000/height)
         new_size = (int(width * ratio), int(height * ratio))
-        img = img.resize(new_size, Image.LANCZOS)
+        img = img.resize(new_size, Image.Resampling.LANCZOS)
     return img
 
 def split_image_if_needed(image_binary):

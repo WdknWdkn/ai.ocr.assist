@@ -145,6 +145,9 @@ async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = None):
                 "use_ocr": True if use_ocr is not None else False  # Fixed type handling
             }, None)
 
+            if result is None:
+                raise ValueError("請求書の解析に失敗しました。")
+                
             parsed_result = json.loads(result["body"])
             return {
                 "message": parsed_result.get("message", "請求書の解析が完了しました。"),
