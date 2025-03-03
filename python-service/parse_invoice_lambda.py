@@ -2,6 +2,7 @@
 import json
 import base64
 import io
+import re
 import openai
 import PyPDF2
 import pytesseract
@@ -14,28 +15,52 @@ def lambda_handler(event, context):
     2) use_ocr=Trueの場合はOCR + ChatGPT でJSON化
     3) JSONレスポンスを返す
     """
-    openai.api_key = "YOUR_OPENAI_API_KEY"
+    openai_api_key = event.get("openai_api_key")
+    if not openai_api_key:
+        raise ValueError("OpenAI API key is required")
+    openai.api_key = openai_api_key
 
     file_bytes_b64 = event.get("file_bytes", "")
+    if not file_bytes_b64:
+        raise ValueError("File bytes are required")
+    
     file_bytes = base64.b64decode(file_bytes_b64)
-    use_ocr = event.get("use_ocr", False)
+    use_ocr = event.get("use_ocr", True)  # Default to True for auto-detection
 
     # PDFをテキスト化
     raw_text = extract_text_from_pdf(file_bytes, use_ocr)
 
     # ChatGPTでJSON化
     unified_text = unify_text_via_openai(raw_text)
+    if not raw_text or not raw_text.strip():
+        raise ValueError("テキストを抽出できませんでした。")
 
     # JSONパース
     structured_data = extract_fields_from_text(unified_text)
+    if not structured_data:
+        raise ValueError("請求書からデータを抽出できませんでした。")
 
     # 14項目にマッピング
     invoice_data = parse_invoice_data(structured_data)
+    if not invoice_data:
+        raise ValueError("請求書からデータを抽出できませんでした。")
+        
+    # For testing purposes - comment out to use actual data processing
+    # invoice_data = [{
+    #     "請求書番号": "TEST-001",
+    #     "発行日": "2025-01-01",
+    #     "請求金額": "50000",
+    #     "取引先名": "テスト株式会社",
+    #     "支払期限": "2025-01-31",
+    #     "備考": "テストデータ"
+    # }]
 
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "invoice_data": invoice_data
+            "message": "請求書の解析が完了しました。",
+            "invoice_data": invoice_data,
+            "text": raw_text or "請求書のテキストデータです"
         })
     }
 
@@ -133,8 +158,7 @@ def unify_text_via_openai(raw_text):
     """
     大幅な表記ゆれがあるテキストを OpenAI の 'o1' モデルで整形・標準化。
     """
-    openai.api_key = OPENAI_API_KEY
-
+    # API key should already be set in lambda_handler
     if not openai.api_key:
         print("Warning: OPENAI_API_KEY is not set. Return original text.")
         return raw_text

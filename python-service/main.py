@@ -107,7 +107,7 @@ async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = False):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Invalid file format. Must be PDF")
     
-    text = await extract_text_from_pdf(file, use_ocr)
+    text = await extract_text_from_pdf(file, use_ocr if use_ocr is not None else False)
     return {"message": "Invoice parsed successfully", "text": text}
 
 @app.post("/api/v1/match")
@@ -157,4 +157,12 @@ async def health_check():
     return {"status": "healthy"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        timeout_keep_alive=120,  # Increased from default to 120
+        workers=2,
+        limit_concurrency=4,
+        timeout_graceful_shutdown=20  # Increased from default to 20
+    )
