@@ -282,11 +282,22 @@ def extract_fields_from_text(text):
     match = re.search(r'```json\n(\[.*?\])\n```', text, re.DOTALL)
     if match:
         json_data_str = match.group(1)  # Matchオブジェクトから文字列を取得
+        print(f"Found JSON in code block: {json_data_str[:100]}...")
     else:
         json_data_str = text.strip()  # そのままテキストを取得
+        print(f"No JSON code block found, using raw text: {json_data_str[:100]}...")
 
     try:
+        # Print the JSON string for debugging
+        print(f"Attempting to parse JSON: {json_data_str[:200]}...")
+        
         invoice_data = json.loads(json_data_str)  # JSON文字列を辞書に変換
+        
+        # Check if the parsed data is empty
+        if not invoice_data:
+            print("Warning: Parsed JSON is empty")
+            return []
+            
         structured_data = []
 
         for entry in invoice_data:
@@ -298,9 +309,36 @@ def extract_fields_from_text(text):
                 "工事業者名": entry.get("工事業者名", "不明")
             })
 
+        print(f"Successfully extracted {len(structured_data)} invoice entries")
         return structured_data
-    except json.JSONDecodeError:
-        print("JSONの解析に失敗しました。")
+    except json.JSONDecodeError as e:
+        print(f"JSONの解析に失敗しました: {e}")
+        print(f"JSON文字列: {json_data_str[:200]}...")
+        
+        # Try to extract JSON from a different format
+        try:
+            # Sometimes the JSON might be wrapped in different markers
+            alt_match = re.search(r'\[(.*?)\]', text, re.DOTALL)
+            if alt_match:
+                alt_json_str = f"[{alt_match.group(1)}]"
+                print(f"Trying alternative JSON format: {alt_json_str[:100]}...")
+                invoice_data = json.loads(alt_json_str)
+                
+                structured_data = []
+                for entry in invoice_data:
+                    structured_data.append({
+                        "発注番号": entry.get("発注番号", "不明"),
+                        "金額": entry.get("金額", "不明"),
+                        "物件名": entry.get("物件名", "不明"),
+                        "部屋番号": entry.get("部屋番号", "不明"),
+                        "工事業者名": entry.get("工事業者名", "不明")
+                    })
+                
+                print(f"Successfully extracted {len(structured_data)} invoice entries using alternative format")
+                return structured_data
+        except Exception as alt_e:
+            print(f"Alternative JSON parsing also failed: {alt_e}")
+        
         return []
 
 def parse_invoice_data(text):
