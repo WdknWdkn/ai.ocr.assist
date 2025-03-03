@@ -37,6 +37,13 @@ services:
             - .env.python
         environment:
             - PYTHONUNBUFFERED=1
+            - PYTHONIOENCODING=utf-8
+            - PYTHONUTF8=1
+        deploy:
+            resources:
+                limits:
+                    memory: 2G
+                    cpus: '1.5'
         networks:
             - sail
         healthcheck:
