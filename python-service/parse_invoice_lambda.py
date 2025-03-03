@@ -15,41 +15,72 @@ def lambda_handler(event, context):
     2) use_ocr=Trueの場合はOCR + ChatGPT でJSON化
     3) JSONレスポンスを返す
     """
+    print("========== 処理開始: lambda_handler ==========")
+    print(f"イベントパラメータ: {event.keys()}")
+    
+    # OpenAI APIキーの取得
+    print("OpenAI APIキーの取得")
     openai_api_key = event.get("openai_api_key")
     if not openai_api_key:
+        print("エラー: OpenAI APIキーが設定されていません")
         raise ValueError("OpenAI API key is required")
+    print("OpenAI APIキーの設定完了")
     openai.api_key = openai_api_key
 
+    # ファイルデータの取得
+    print("ファイルデータの取得")
     file_bytes_b64 = event.get("file_bytes", "")
     if not file_bytes_b64:
+        print("エラー: ファイルデータが空です")
         raise ValueError("File bytes are required")
     
+    # Base64デコード
+    print("Base64デコードの実行")
     file_bytes = base64.b64decode(file_bytes_b64)
+    print(f"デコード後のファイルサイズ: {len(file_bytes)} バイト")
+    
+    # OCRフラグの取得
     use_ocr = event.get("use_ocr", True)  # Default to True for auto-detection
+    print(f"OCR使用フラグ: {use_ocr}")
 
-    # PDFをテキスト化
+    # ステップ1: PDFをテキスト化
+    print("========== ステップ1: PDFテキスト抽出 ==========")
     raw_text = extract_text_from_pdf(file_bytes, use_ocr)
     if not raw_text or not raw_text.strip():
+        print("エラー: PDFからテキストを抽出できませんでした")
         raise ValueError("テキストを抽出できませんでした。")
+    print(f"抽出されたテキスト長: {len(raw_text)} 文字")
+    print(f"テキストサンプル: {raw_text[:100]}...")
 
-    # ChatGPTでJSON化
+    # ステップ2: ChatGPTでJSON化
+    print("========== ステップ2: OpenAIによるテキスト処理 ==========")
     unified_text = unify_text_via_openai(raw_text)
     if not unified_text or not unified_text.strip():
+        print("エラー: OpenAIによるテキスト処理に失敗しました")
         raise ValueError("テキストを抽出できませんでした。")
+    print(f"OpenAI処理後のテキスト長: {len(unified_text)} 文字")
+    print(f"処理後テキストサンプル: {unified_text[:100]}...")
 
-    # JSONパース
+    # ステップ3: JSONパース
+    print("========== ステップ3: JSONパース ==========")
     structured_data = extract_fields_from_text(unified_text)
     if not structured_data:
+        print("エラー: JSONパースに失敗しました")
         raise ValueError("請求書からデータを抽出できませんでした。")
+    print(f"抽出されたデータ項目数: {len(structured_data)}")
+    print(f"抽出データサンプル: {structured_data[0] if structured_data else 'なし'}")
 
-    # 14項目にマッピング
+    # ステップ4: 14項目にマッピング
+    print("========== ステップ4: データマッピング ==========")
     invoice_data = parse_invoice_data(structured_data)
     if not invoice_data:
+        print("エラー: データマッピングに失敗しました")
         raise ValueError("請求書からデータを抽出できませんでした。")
-        
-    # For testing purposes - uncomment to use test data when extraction fails
+    print(f"マッピング後のデータ項目数: {len(invoice_data)}")
+    
+    # テストデータのフォールバック
     if not invoice_data:
-        print("Using test data as fallback since extraction failed")
+        print("警告: 抽出に失敗したためテストデータを使用します")
         invoice_data = [{
             "発注番号": "TEST-001",
             "金額": "50000",
@@ -63,8 +94,11 @@ def lambda_handler(event, context):
             "支払期限": "2025-01-31",
             "備考": "テストデータ"
         }]
+        print("テストデータの設定完了")
 
-    return {
+    # レスポンスの作成
+    print("========== 処理完了: レスポンス作成 ==========")
+    response = {
         "statusCode": 200,
         "body": json.dumps({
             "message": "請求書の解析が完了しました。",
@@ -72,6 +106,10 @@ def lambda_handler(event, context):
             "text": raw_text or "請求書のテキストデータです"
         })
     }
+    print(f"レスポンスステータス: {response['statusCode']}")
+    print(f"請求書データ項目数: {len(invoice_data)}")
+    print("処理完了")
+    return response
 
 def extract_text_from_pdf(pdf_bytes, use_ocr=True):
     """
@@ -342,10 +380,20 @@ def extract_fields_from_text(text):
         return []
 
 def parse_invoice_data(text):
-    # すでに pdf_data はリスト of dict なので、そのまま14項目を埋める処理だけ行う。
+    """
+    抽出されたデータを14項目にマッピングする
+    """
+    print("データマッピング処理開始")
+    print(f"入力データ項目数: {len(text)}")
+    
     structured_data = []
-    for entry in text:  # pdf_data は extract_fields_from_text の戻り値(list)
-        structured_data.append({
+    for i, entry in enumerate(text):  # pdf_data は extract_fields_from_text の戻り値(list)
+        print(f"データ項目 {i+1} の処理:")
+        print(f"  発注番号: {entry.get('発注番号', '不明')}")
+        print(f"  金額: {entry.get('金額', '不明')}")
+        print(f"  物件名: {entry.get('物件名', '不明')}")
+        
+        mapped_entry = {
             "発注番号": entry.get("発注番号", "不明"),
             "金額": entry.get("金額", "不明"),
             "物件名": entry.get("物件名", "不明"),
@@ -362,5 +410,8 @@ def parse_invoice_data(text):
             "支払日": entry.get("支払日", "不明"),
             "立替金": entry.get("立替金", "不明"),
             "請求日": entry.get("請求日", "不明")
-        })
+        }
+        structured_data.append(mapped_entry)
+    
+    print(f"マッピング完了: {len(structured_data)} 項目")
     return structured_data
