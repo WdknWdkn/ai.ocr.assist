@@ -112,69 +112,105 @@ async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = None):
     """
     PDFまたは画像ファイルを受け取り、請求書データを抽出する
     """
-    print(f"Starting invoice parsing for file: {file.filename}, use_ocr: {use_ocr}")
+    print("========== 処理開始: FastAPI 請求書解析エンドポイント ==========")
+    print(f"ファイル名: {file.filename}, OCR使用フラグ: {use_ocr}")
     
+    # ファイル形式の検証
+    print("ファイル形式の検証")
     if not file.filename.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')):
-        print(f"Invalid file format: {file.filename}")
+        print(f"エラー: 不正なファイル形式: {file.filename}")
         raise HTTPException(
             status_code=400,
             detail="ファイルの形式が正しくありません。PDF、JPG、またはPNG形式のファイルを選択してください。"
         )
 
     try:
+        # ファイルの読み込み
+        print("ファイルの読み込み開始")
         content = await file.read()
         content_size = len(content)
-        print(f"File content size: {content_size} bytes")
+        print(f"ファイルサイズ: {content_size} バイト")
         
+        # ファイルサイズの検証
+        print("ファイルサイズの検証")
         if content_size > MAX_FILE_SIZE:
-            print(f"File too large: {content_size} bytes (max: {MAX_FILE_SIZE} bytes)")
+            print(f"エラー: ファイルサイズ超過: {content_size} バイト (上限: {MAX_FILE_SIZE} バイト)")
             raise HTTPException(
                 status_code=413,
                 detail="ファイルサイズは1MB以下にしてください。"
             )
 
-        # Convert to base64
+        # Base64エンコード
+        print("ファイルデータのBase64エンコード")
         file_bytes_b64 = base64.b64encode(content).decode()
+        print(f"Base64エンコード後のサイズ: {len(file_bytes_b64)} 文字")
 
-        # Get OpenAI API key from environment
+        # OpenAI APIキーの取得
+        print("OpenAI APIキーの取得")
         openai_api_key = os.getenv("OPENAI_API_KEY")
         if not openai_api_key:
-            print("Warning: OpenAI API key not found. Using mock implementation.")
+            print("警告: OpenAI APIキーが見つかりません。モック実装を使用します。")
             openai_api_key = "sk-mock-key-for-testing"
+            print("モックAPIキーを設定しました")
             # Continue with mock key - the mock_openai.py will be used automatically
             # when the real OpenAI module is not available
 
         try:
-            print(f"Calling lambda handler with use_ocr={True if use_ocr is not None else False}")
+            # Lambda関数の呼び出し
+            print("========== Lambda関数の呼び出し ==========")
+            use_ocr_value = True if use_ocr is not None else False
+            print(f"Lambda関数パラメータ: use_ocr={use_ocr_value}, APIキー長={len(openai_api_key)}")
+            
             # Process with lambda handler
             result = parse_invoice_lambda.lambda_handler({
                 "file_bytes": file_bytes_b64,
                 "openai_api_key": openai_api_key,
-                "use_ocr": True if use_ocr is not None else False  # Fixed type handling
+                "use_ocr": use_ocr_value  # Fixed type handling
             }, None)
 
+            # 結果の検証
+            print("Lambda関数の実行結果の検証")
             if result is None:
+                print("エラー: Lambda関数の結果がNoneです")
                 raise ValueError("請求書の解析に失敗しました。")
-                
+            
+            print(f"Lambda関数のステータスコード: {result.get('statusCode')}")
+            
+            # レスポンスのパース
+            print("レスポンスJSONのパース")
             parsed_result = json.loads(result["body"])
-            return {
+            
+            # レスポンスの作成
+            print("クライアントへのレスポンス作成")
+            response = {
                 "message": parsed_result.get("message", "請求書の解析が完了しました。"),
                 "invoice_data": parsed_result.get("invoice_data", []),
                 "text": parsed_result.get("text", "")
             }
+            
+            print(f"抽出されたデータ項目数: {len(response['invoice_data'])}")
+            print("========== 処理完了: 正常終了 ==========")
+            return response
 
         except ValueError as e:
+            print(f"エラー: 値エラー: {str(e)}")
+            print("========== 処理完了: バリデーションエラー ==========")
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
-            print(f"Error in parse_invoice: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+            print(f"エラー: 予期しないエラー: {str(e)}")
+            print(f"詳細なスタックトレース:\n{traceback.format_exc()}", file=sys.stderr)
+            print("========== 処理完了: 内部エラー ==========")
             raise HTTPException(
                 status_code=500,
                 detail="ファイルの解析中にエラーが発生しました。"
             )
     except HTTPException:
+        # HTTPExceptionはそのまま再スロー
         raise
     except Exception as e:
-        print(f"Error in parse_invoice: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+        print(f"エラー: 予期しないエラー（ファイル処理）: {str(e)}")
+        print(f"詳細なスタックトレース:\n{traceback.format_exc()}", file=sys.stderr)
+        print("========== 処理完了: 内部エラー（ファイル処理） ==========")
         raise HTTPException(
             status_code=500,
             detail="ファイルの解析中にエラーが発生しました。"
