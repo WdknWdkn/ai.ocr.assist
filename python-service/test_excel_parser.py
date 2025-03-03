@@ -3,11 +3,10 @@ import sys
 from parse_order_lambda import parse_excel
 import openpyxl
 from io import BytesIO
-import logging
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Import the centralized logger
+from logger import setup_logger
+logger = setup_logger(__name__)
 
 # Create a test Excel file
 wb = openpyxl.Workbook()

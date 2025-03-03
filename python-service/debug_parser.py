@@ -3,12 +3,11 @@ import pandas as pd
 import io
 import sys
 import json
-import logging
 from parse_order_lambda import parse_excel
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Import the centralized logger
+from logger import setup_logger
+logger = setup_logger(__name__)
 
 def debug_excel_parsing(file_path):
     """Debug Excel parsing with detailed logging."""
