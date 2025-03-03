@@ -120,9 +120,14 @@ def extract_text_from_pdf(pdf_bytes, use_ocr=True):
             # 分割後バイナリを順次OCRして連結
             for sbin in splitted_binaries:
                 try:
+                    # Load and optimize image before OCR
+                    img = Image.open(io.BytesIO(sbin))
+                    img = optimize_image(img)
+                    print(f"Image optimized to size: {img.size}")
+                    
                     # First try Japanese + English OCR with horizontal text
                     text_page = pytesseract.image_to_string(
-                        Image.open(io.BytesIO(sbin)), 
+                        img,
                         lang='jpn+eng',
                         config='--psm 6'  # Assume uniform block of text
                     )
@@ -147,6 +152,18 @@ def extract_text_from_pdf(pdf_bytes, use_ocr=True):
     return text_all
 
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+
+def optimize_image(img):
+    """
+    画像サイズを最適化する。
+    2000px以上の画像はアスペクト比を保持しながらリサイズする。
+    """
+    width, height = img.size
+    if width > 2000 or height > 2000:
+        ratio = min(2000/width, 2000/height)
+        new_size = (int(width * ratio), int(height * ratio))
+        img = img.resize(new_size, Image.LANCZOS)
+    return img
 
 def split_image_if_needed(image_binary):
     """
