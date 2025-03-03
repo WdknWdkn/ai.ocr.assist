@@ -70,19 +70,26 @@ def extract_text_from_pdf(pdf_bytes, use_ocr=True):
     画像PDFの場合、use_ocr=True で Tesseract OCRを呼び出す。
     日本語テキストの場合は常にOCRを試みる。
     """
+    print(f"Starting PDF processing: {len(pdf_bytes)} bytes")
     text_all = ""
     is_japanese = False
 
     # First try normal PDF text extraction
     try:
+        print("Attempting standard PDF text extraction...")
         reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-        for page in reader.pages:
+        total_pages = len(reader.pages)
+        print(f"Processing {total_pages} pages")
+        
+        for i, page in enumerate(reader.pages, 1):
+            print(f"Processing page {i}/{total_pages} with standard extraction")
             extracted = page.extract_text()
             if extracted and extracted.strip():
                 text_all += extracted + "\n"
                 # Check if text contains Japanese characters
                 if any(ord(c) > 0x3000 for c in extracted):
                     is_japanese = True
+                    print("Japanese text detected")
     except Exception as e:
         print(f"PDF text extraction failed: {e}")
         
@@ -91,17 +98,23 @@ def extract_text_from_pdf(pdf_bytes, use_ocr=True):
     # 2. OCR is forced, or
     # 3. Japanese text was detected
     if not text_all.strip() or use_ocr or is_japanese:
+        print(f"Starting OCR processing (no text: {not text_all.strip()}, forced: {use_ocr}, japanese: {is_japanese})")
 
         # OCRを実行 (pdf2image + pytesseract)
+        print("Converting PDF to images...")
         images = convert_from_bytes(pdf_bytes)
+        print(f"Converted PDF to {len(images)} images")
 
-        for img in images:
+        for i, img in enumerate(images, 1):
+            print(f"Processing image {i}/{len(images)}")
             output = io.BytesIO()
             # PDF2Image で得られた PIL Image を PNG化
             img.save(output, format="PNG")
             image_binary = output.getvalue()
+            print(f"Image {i} size: {len(image_binary)} bytes")
 
             # 5MB超なら分割
+            print(f"Checking if image {i} needs splitting...")
             splitted_binaries = split_image_if_needed(image_binary)
 
             # 分割後バイナリを順次OCRして連結
