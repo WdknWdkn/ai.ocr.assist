@@ -34,6 +34,8 @@ def lambda_handler(event, context):
 
     # ChatGPTでJSON化
     unified_text = unify_text_via_openai(raw_text)
+    if not raw_text or not raw_text.strip():
+        raise ValueError("テキストを抽出できませんでした。")
 
     # JSONパース
     structured_data = extract_fields_from_text(unified_text)
@@ -44,23 +46,23 @@ def lambda_handler(event, context):
     invoice_data = parse_invoice_data(structured_data)
     if not invoice_data:
         raise ValueError("請求書からデータを抽出できませんでした。")
-
-    # For testing purposes, always return mock data
-    invoice_data = [{
-        "請求書番号": "TEST-001",
-        "発行日": "2025-01-01",
-        "請求金額": "50000",
-        "取引先名": "テスト株式会社",
-        "支払期限": "2025-01-31",
-        "備考": "テストデータ"
-    }]
+        
+    # For testing purposes - comment out to use actual data processing
+    # invoice_data = [{
+    #     "請求書番号": "TEST-001",
+    #     "発行日": "2025-01-01",
+    #     "請求金額": "50000",
+    #     "取引先名": "テスト株式会社",
+    #     "支払期限": "2025-01-31",
+    #     "備考": "テストデータ"
+    # }]
 
     return {
         "statusCode": 200,
         "body": json.dumps({
             "message": "請求書の解析が完了しました。",
             "invoice_data": invoice_data,
-            "text": raw_text or "請求書のテストデータです"
+            "text": raw_text or "請求書のテキストデータです"
         })
     }
 
@@ -206,8 +208,13 @@ def unify_text_via_openai(raw_text):
     """
     大幅な表記ゆれがあるテキストを OpenAI の GPT-4 モデルで整形・標準化。
     """
-    if not raw_text or not raw_text.strip():
-        raise ValueError("テキストが空です。")
+    # API key should already be set in lambda_handler
+    if not openai.api_key:
+        print("Warning: OPENAI_API_KEY is not set. Return original text.")
+        return raw_text
+
+    print("raw_text=================================")
+    print(raw_text)
 
     try:
         if not openai.api_key:

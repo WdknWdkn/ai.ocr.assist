@@ -108,7 +108,7 @@ async def parse_orders(file: UploadFile):
         )
 
 @app.post("/api/v1/invoices/parse")
-async def parse_invoice(file: UploadFile):
+async def parse_invoice(file: UploadFile, use_ocr: Optional[bool] = None):
     """
     PDFまたは画像ファイルを受け取り、請求書データを抽出する
     """
@@ -142,22 +142,7 @@ async def parse_invoice(file: UploadFile):
             result = parse_invoice_lambda.lambda_handler({
                 "file_bytes": file_bytes_b64,
                 "openai_api_key": openai_api_key,
-                "use_ocr": True  # Auto-detect in lambda function
-            }, None)
-
-            # Get OpenAI API key from environment
-            openai_api_key = os.getenv("OPENAI_API_KEY")
-            if not openai_api_key:
-                raise HTTPException(
-                    status_code=500,
-                    detail="OpenAI APIキーが設定されていません。"
-                )
-
-            # Process with lambda handler
-            result = parse_invoice_lambda.lambda_handler({
-                "file_bytes": file_bytes_b64,
-                "openai_api_key": openai_api_key,
-                "use_ocr": True  # Auto-detect in lambda function
+                "use_ocr": True if use_ocr is not None else False  # Fixed type handling
             }, None)
 
             parsed_result = json.loads(result["body"])
@@ -235,8 +220,8 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=8000,
-        timeout_keep_alive=75,
+        timeout_keep_alive=120,  # Increased from default to 120
         workers=2,
         limit_concurrency=4,
-        timeout_graceful_shutdown=10
+        timeout_graceful_shutdown=20  # Increased from default to 20
     )

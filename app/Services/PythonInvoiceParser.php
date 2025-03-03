@@ -10,7 +10,7 @@ use Exception;
 
 class PythonInvoiceParser
 {
-    private const TIMEOUT_SECONDS = 30;
+    private const TIMEOUT_SECONDS = 60;  // Increased from 30 to 60
     private const API_URL = 'http://python.ocr:8000/api/v1/invoices/parse';
 
     public function parse(string $content, string $filename): array
